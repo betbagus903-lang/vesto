@@ -5,6 +5,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StorefrontController;
 use App\Http\Controllers\Buyer\DashboardController as BuyerDashboardController;
 use App\Http\Controllers\Buyer\ProfileController as BuyerProfileController;
+use App\Http\Controllers\Buyer\WishlistController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\CategoryController;
@@ -13,6 +14,8 @@ use App\Http\Controllers\Admin\AttributeController;
 use App\Http\Controllers\Admin\AttributeFamilyController;
 use App\Http\Controllers\Admin\CustomerGroupController;
 use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\ShipmentController;
 use App\Http\Controllers\Admin\InvoiceController;
@@ -22,27 +25,47 @@ use App\Http\Controllers\Admin\Marketing\CampaignController;
 use App\Http\Controllers\Admin\Marketing\CouponController;
 use App\Http\Controllers\Admin\Marketing\SEOController;
 use App\Http\Controllers\Admin\AIAssistantController;
+use App\Http\Controllers\Admin\InventoryController;
+use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\Admin\EmployeeController;
+use App\Http\Controllers\Admin\CalendarController;
+use App\Http\Controllers\Admin\MessageController;
+use App\Http\Controllers\ProductQuestionController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Landing page
-Route::get('/', [StorefrontController::class, 'home'])->name('home');
+// Welcome page (landing page pertama) - PUBLIC
+Route::get('/', function () {
+    return Inertia::render('Welcome', [
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
+        'auth' => [
+            'user' => auth()->user(),
+        ],
+    ]);
+})->name('welcome');
 
-// Alternate demo welcome page
-Route::get('/welcome', fn() => Inertia::render('Welcome'))->name('welcome');
+// Redirect /welcome to root
+Route::get('/welcome', function () {
+    return redirect()->route('welcome');
+})->name('welcome.redirect');
 
-// Earth Well landing page
-Route::get('/earthwell', fn() => Inertia::render('EarthWell'))->name('earthwell');
-
-// Heart demo page (removed)
-
-// Shop
-Route::get('/shop/{category?}', [StorefrontController::class, 'shop'])->name('shop');
-
-// Cart
-Route::get('/cart', fn() => Inertia::render('Cart'))->name('cart');
+// Store home page (Home.jsx dengan produk/kategori) - AUTH REQUIRED
+Route::middleware(['auth'])->group(function () {
+    Route::get('/home', [StorefrontController::class, 'home'])->name('home');
+    
+    // Earth Well landing page
+    Route::get('/earthwell', fn() => Inertia::render('EarthWell'))->name('earthwell');
+    
+    // Shop (dengan opsi category)
+    Route::get('/shop/{category?}', [StorefrontController::class, 'shop'])->name('shop');
+    
+    // Cart
+    Route::get('/cart', fn() => Inertia::render('Cart'))->name('cart');
+});
 
 // Checkout - requires authentication
 Route::middleware(['auth'])->group(function () {
@@ -50,39 +73,51 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
 });
 
-// Order Success
-Route::get('/order-success', fn() => Inertia::render('OrderSuccess'))->name('order.success');
+// Order Success - AUTH REQUIRED (after checkout)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/order-success', fn() => Inertia::render('OrderSuccess'))->name('order.success');
+});
 
-// Product detail
-Route::get('/products/{slug}', [StorefrontController::class, 'product'])->name('product.show');
+// Product detail - AUTH REQUIRED
+Route::middleware(['auth'])->group(function () {
+    Route::get('/products/{slug}', [StorefrontController::class, 'product'])->name('product.show');
+    Route::post('/products/{id}/questions', [ProductQuestionController::class, 'store'])->name('product.questions.store');
+});
 
-// Redirect dashboard
-Route::get('/dashboard', function () {
-    return redirect()->route('buyer.dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Redirect dashboard - AUTH REQUIRED
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', function () {
+        $user = auth()->user();
+        
+        if ($user->role === 'admin') {
+            return redirect('/admin/dashboard');
+        }
+        
+        return redirect()->route('buyer.dashboard');
+    })->name('dashboard');
+});
 
 // Buyer routes
-Route::middleware(['auth', 'verified', 'buyer'])->prefix('buyer')->name('buyer.')->group(function () {
-    Route::get('/dashboard', [BuyerDashboardController::class, 'index'])->name('dashboard');
-    Route::get('/profile', [BuyerProfileController::class, 'index'])->name('profile');
-    Route::get('/wishlist', fn() => Inertia::render('Buyer/Wishlist', [
-        'user' => auth()->user(),
-    ]))->name('wishlist');
-    Route::get('/addresses', fn() => Inertia::render('Buyer/Addresses'))->name('addresses');
-    Route::get('/reviews', [ReviewController::class, 'myReviews'])->name('reviews');
-    Route::post('/reviews', [ReviewController::class, 'store'])->name('reviews.store');
-    Route::put('/reviews/{review}', [ReviewController::class, 'update'])->name('reviews.update');
-    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
-    Route::post('/reviews/{review}/replies', [ReviewController::class, 'storeReply'])->name('reviews.replies.store');
-    Route::put('/reviews/{review}/replies/{reply}', [ReviewController::class, 'updateReply'])->name('reviews.replies.update');
-    Route::delete('/reviews/{review}/replies/{reply}', [ReviewController::class, 'destroyReply'])->name('reviews.replies.destroy');
-    Route::post('/reviews/{review}/helpful', [ReviewController::class, 'toggleHelpful'])->name('reviews.helpful.toggle');
-    Route::get('/orders', fn() => Inertia::render('Buyer/MyOrders'))->name('orders');
+Route::middleware(['auth', 'buyer'])->prefix('buyer')->group(function () {
+    Route::get('/dashboard', [BuyerDashboardController::class, 'index'])->name('buyer.dashboard');
+    Route::get('/orders', [BuyerDashboardController::class, 'orders'])->name('buyer.orders');
+    Route::get('/wishlist', [BuyerDashboardController::class, 'wishlist'])->name('buyer.wishlist');
+    Route::post('/wishlist/toggle', [Buyer\WishlistController::class, 'toggle'])->name('buyer.wishlist.toggle');
+    Route::get('/profile', [BuyerProfileController::class, 'index'])->name('buyer.profile');
+    Route::put('/profile', [BuyerProfileController::class, 'update'])->name('buyer.profile.update');
+    Route::get('/reviews', [BuyerDashboardController::class, 'reviews'])->name('buyer.reviews');
+    Route::get('/coupons', [BuyerDashboardController::class, 'coupons'])->name('buyer.coupons');
+    Route::get('/addresses', fn() => Inertia::render('Buyer/Addresses'))->name('buyer.addresses');
+    Route::get('/payment-methods', fn() => Inertia::render('Buyer/PaymentMethods'))->name('buyer.payment-methods');
+    Route::get('/notifications', fn() => Inertia::render('Buyer/Notifications'))->name('buyer.notifications');
+    Route::get('/security', fn() => Inertia::render('Buyer/Security'))->name('buyer.security');
+    Route::get('/settings', fn() => Inertia::render('Buyer/Settings'))->name('buyer.settings');
 });
 
 // Admin routes (Vue.js)
 Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/settings', fn() => Inertia::render('Admin/Settings'))->name('settings');
         // Products routes
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
@@ -98,10 +133,17 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     
     // Product Variants routes (MUST be before generic /products/{id} routes!)
     Route::post('/products/{id}/variants', [ProductController::class, 'storeVariant'])->name('products.variants.store');
+ Route::get('/product-variants/{variant}', [ProductController::class, 'getVariant'])->name('product-variants.show');
     Route::post('/product-variants/{variant}/images', [ProductController::class, 'uploadVariantImage'])->name('product-variants.uploadImage');
     Route::post('/product-variants/{variant}/update', [ProductController::class, 'updateVariant'])->name('product-variants.update-with-files');
     Route::put('/product-variants/{variant}', [ProductController::class, 'updateVariant'])->name('product-variants.update');
     Route::delete('/product-variants/{variant}', [ProductController::class, 'destroyVariant'])->name('product-variants.destroy');
+    
+    // Product Designer routes (MUST be before generic /products/{id} routes!)
+    Route::get('/products/design/{id}/image/{index}', [ProductController::class, 'designImage'])->name('products.design.image');
+    Route::get('/products/design/{id}/variant/{variantId}/image/{index}', [ProductController::class, 'designVariantImage'])->name('products.design.variant.image');
+    Route::post('/products/save-design', [ProductController::class, 'saveProductDesign'])->name('products.save-design');
+    Route::post('/product-variants/{variant}/copy-design', [ProductController::class, 'copyVariantDesign'])->name('product-variants.copy-design');
     
     // Route Detail, Edit, Update, Delete, Duplicate
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
@@ -128,6 +170,27 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::get('/attribute-families/{id}/edit', [AttributeFamilyController::class, 'edit'])->name('attribute-families.edit');
     Route::put('/attribute-families/{id}', [AttributeFamilyController::class, 'update'])->name('attribute-families.update');
     Route::delete('/attribute-families/{id}', [AttributeFamilyController::class, 'destroy'])->name('attribute-families.destroy');
+
+    // Users Management
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+    Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::post('/users/bulk-delete', [UserController::class, 'bulkDelete'])->name('users.bulk-delete');
+    // User detail routes — wildcard AFTER named sub-routes
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+    Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+    Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    Route::put('/users/{user}/status', [UserController::class, 'updateStatus'])->name('users.status');
+    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+
+    // Reports
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/sales', [ReportController::class, 'sales'])->name('reports.sales');
+    Route::get('/reports/customers', [ReportController::class, 'customers'])->name('reports.customers');
+    Route::get('/reports/products', [ReportController::class, 'products'])->name('reports.products');
+    Route::get('/reports/inventory', [ReportController::class, 'inventory'])->name('reports.inventory');
+    Route::post('/reports/export', [ReportController::class, 'export'])->name('reports.export');
 
     // Customers routes
     Route::get('/customers',                            [CustomerController::class, 'index'])->name('customers.index');
@@ -192,7 +255,11 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('/banners/create', [BannerController::class, 'create'])->name('banners.create');
         Route::post('/banners', [BannerController::class, 'store'])->name('banners.store');
         Route::post('/banners/upload-image', [BannerController::class, 'uploadImage'])->name('banners.upload-image');
+        Route::post('/banners/upload-design-asset', [BannerController::class, 'uploadDesignAsset'])->name('banners.upload-design-asset');
+        Route::get('/banners/designer', [BannerController::class, 'designer'])->name('banners.designer');
+        Route::post('/banners/save-design', [BannerController::class, 'saveDesign'])->name('banners.save-design');
         Route::get('/banners/{banner}/edit', [BannerController::class, 'edit'])->name('banners.edit');
+        Route::get('/banners/{banner}/designer', [BannerController::class, 'designerEdit'])->name('banners.designer-edit');
         Route::put('/banners/{banner}', [BannerController::class, 'update'])->name('banners.update');
         Route::delete('/banners/{banner}', [BannerController::class, 'destroy'])->name('banners.destroy');
 
@@ -228,6 +295,36 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('/seo', [SEOController::class, 'index'])->name('seo.index');
         Route::put('/seo', [SEOController::class, 'update'])->name('seo.update');
     });
+
+    // ── Inventory ─────────────────────────────────────────────────────────────
+    Route::get('/inventory',                    [InventoryController::class, 'index'])->name('inventory.index');
+    Route::patch('/inventory/{id}/stock',       [InventoryController::class, 'update'])->name('inventory.update');
+    Route::post('/inventory/bulk-update',       [InventoryController::class, 'bulkUpdate'])->name('inventory.bulk-update');
+
+    // ── Suppliers ─────────────────────────────────────────────────────────────
+    Route::get('/suppliers',                    [SupplierController::class, 'index'])->name('suppliers.index');
+    Route::get('/suppliers/{id}',               [SupplierController::class, 'show'])->name('suppliers.show');
+
+    // ── Finance ───────────────────────────────────────────────────────────────
+    Route::get('/finance',                      [FinanceController::class, 'index'])->name('finance.index');
+    Route::get('/finance/transactions',         fn() => redirect()->route('admin.finance.index'))->name('finance.transactions');
+    Route::get('/finance/invoices',             fn() => redirect()->route('admin.finance.index'))->name('finance.invoices');
+    Route::get('/finance/expenses',             fn() => redirect()->route('admin.finance.index'))->name('finance.expenses');
+
+    // ── Employees ─────────────────────────────────────────────────────────────
+    Route::get('/employees',                    [EmployeeController::class, 'index'])->name('employees.index');
+
+    // ── Calendar ──────────────────────────────────────────────────────────────
+    Route::get('/calendar',                     [CalendarController::class, 'index'])->name('calendar.index');
+
+    // ── Messages ──────────────────────────────────────────────────────────────
+    Route::get('/messages',                     [MessageController::class, 'index'])->name('messages.index');
+
+    // ── Product Questions ──────────────────────────────────────────────────────
+    Route::get('/product-questions',            [ProductQuestionController::class, 'index'])->name('product-questions.index');
+    Route::get('/product-questions/{id}',       [ProductQuestionController::class, 'show'])->name('product-questions.show');
+    Route::post('/product-questions/{id}/answer', [ProductQuestionController::class, 'answer'])->name('product-questions.answer');
+    Route::delete('/product-questions/{id}',    [ProductQuestionController::class, 'destroy'])->name('product-questions.destroy');
 
     // AI Assistant
     Route::prefix('ai')->name('ai.')->group(function () {
@@ -287,11 +384,14 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Static pages
-Route::get('/faq', fn() => Inertia::render('Pages/Faq'))->name('faq');
-Route::get('/shipping', fn() => Inertia::render('Pages/Shipping'))->name('shipping');
-Route::get('/returns', fn() => Inertia::render('Pages/Returns'))->name('returns');
-Route::get('/contact', fn() => Inertia::render('Pages/Contact'))->name('contact');
-Route::get('/privacy-policy', fn() => Inertia::render('Pages/PrivacyPolicy'))->name('privacy');
-Route::get('/terms', fn() => Inertia::render('Pages/Terms'))->name('terms');
+// Static pages - AUTH REQUIRED
+Route::middleware(['auth'])->group(function () {
+    Route::get('/faq', fn() => Inertia::render('Pages/Faq'))->name('faq');
+    Route::get('/shipping', fn() => Inertia::render('Pages/Shipping'))->name('shipping');
+    Route::get('/returns', fn() => Inertia::render('Pages/Returns'))->name('returns');
+    Route::get('/contact', fn() => Inertia::render('Pages/Contact'))->name('contact');
+    Route::get('/privacy-policy', fn() => Inertia::render('Pages/PrivacyPolicy'))->name('privacy');
+    Route::get('/terms', fn() => Inertia::render('Pages/Terms'))->name('terms');
+});
 
 require __DIR__.'/auth.php';

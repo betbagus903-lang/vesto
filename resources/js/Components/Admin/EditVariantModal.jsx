@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
-import { X, Upload, Trash2, ExternalLink } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Upload, Trash2, ExternalLink, Wand2 } from 'lucide-react';
 
-export default function EditVariantModal({ variant, onClose, onSaved }) {
+export default function EditVariantModal({ variant, productId, onClose, onSaved, allVariants = [] }) {
     const [formData, setFormData] = useState({
         name: variant.name || '',
         sku: variant.sku || '',
@@ -15,7 +15,29 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
     const [showSuccess, setShowSuccess] = useState(false);
+    const [showCopyModal, setShowCopyModal] = useState(false);
+    const [showCopyDesignModal, setShowCopyDesignModal] = useState(false);
+    const [copyingDesign, setCopyingDesign] = useState(false);
+    const [selectedCopyTargets, setSelectedCopyTargets] = useState([]);
     const fileInputRef = useRef(null);
+
+    // Listen for messages from designer window
+    useEffect(() => {
+        const handleMessage = (event) => {
+            console.log('Modal received message:', event.data);
+            
+            // Convert both to string for comparison (Designer sends string from context)
+            if (event.data.type === 'VARIANT_IMAGE_DESIGNED' && String(event.data.variantId) === String(variant.id)) {
+                console.log('Adding image:', event.data.imagePath);
+                const newImagePath = event.data.imagePath;
+                setExistingImages(prev => [...prev, newImagePath]);
+            }
+        };
+
+        console.log('Setting up message listener for variant:', variant.id);
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [variant.id]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -38,6 +60,39 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
 
     const handleRemoveNew = (index) => {
         setNewImageFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleCopyDesignToVariants = async (targetVariantIds) => {
+        setCopyingDesign(true);
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            const response = await fetch(`/admin/product-variants/${variant.id}/copy-design`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ target_variant_ids: targetVariantIds }),
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                alert(`Design copied to ${result.copied_count} variant(s) successfully!`);
+                setShowCopyDesignModal(false);
+                if (onSaved) {
+                    onSaved();
+                }
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to copy design');
+            }
+        } catch (error) {
+            console.error('Error copying design:', error);
+            alert('Failed to copy design');
+        } finally {
+            setCopyingDesign(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -343,9 +398,33 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
 
                         {/* Images */}
                         <div>
-                            <label style={{ display: 'block', fontSize: '13px', color: '#94A3B8', marginBottom: '8px' }}>
-                                Images
-                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', color: '#94A3B8', margin: 0 }}>
+                                    Images
+                                </label>
+                                {existingImages.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => window.open(`/admin/products/design/${productId}/variant/${variant.id}/image/0`, '_blank')}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '6px 12px',
+                                            fontSize: '12px',
+                                            fontWeight: 500,
+                                            backgroundColor: '#3B82F6',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <Wand2 size={14} />
+                                        Edit First Image
+                                    </button>
+                                )}
+                            </div>
                             <input
                                 type="file"
                                 ref={fileInputRef}
@@ -354,25 +433,105 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
                                 multiple
                                 onChange={handleImageUpload}
                             />
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '10px 16px',
-                                    backgroundColor: '#0C1524',
-                                    border: '1px solid #1E293B',
-                                    borderRadius: '8px',
-                                    color: '#94A3B8',
-                                    fontSize: '13px',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                <Upload size={16} />
-                                Upload Image
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: '10px 16px',
+                                            backgroundColor: '#0C1524',
+                                            border: '1px solid #1E293B',
+                                            borderRadius: '8px',
+                                            color: '#94A3B8',
+                                            fontSize: '13px',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <Upload size={16} />
+                                        Upload Image
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => window.open(`/admin/products/design/${productId}/variant/${variant.id}/image/new`, '_blank')}
+                                        style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: '10px 16px',
+                                            backgroundColor: '#3B82F6',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            color: '#fff',
+                                            fontSize: '13px',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <Wand2 size={16} />
+                                        Design New
+                                    </button>
+                                </div>
+                                {existingImages.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCopyDesignModal(true)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: '10px 16px',
+                                            backgroundColor: '#8B5CF6',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            color: '#fff',
+                                            fontSize: '13px',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                        Copy Design to Other Variants
+                                    </button>
+                                )}
+                                {allVariants.filter(v => v.id !== variant.id && v.images?.length > 0).length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCopyModal(true)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            padding: '10px 16px',
+                                            backgroundColor: '#10B981',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            color: '#fff',
+                                            fontSize: '13px',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                        Copy Layout from Variant
+                                    </button>
+                                )}
+                            </div>
 
                             {/* Existing and New Images */}
                             {(existingImages.length > 0 || newImageFiles.length > 0) && (
@@ -391,6 +550,26 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
                                                     backgroundColor: '#0C1524',
                                                 }}
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => window.open(`/admin/products/design/${productId}/variant/${variant.id}/image/${index}`, '_blank')}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '-6px',
+                                                    left: '-6px',
+                                                    padding: '4px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#3B82F6',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                }}
+                                                title="Design Image"
+                                            >
+                                                <Wand2 size={12} />
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveExisting(index)}
@@ -466,6 +645,7 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
                         {/* Open Full Variant Detail */}
                         <button
                             type="button"
+                            onClick={() => window.open(`/admin/products/design/${productId}/variant/${variant.id}`, '_blank')}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -486,7 +666,254 @@ export default function EditVariantModal({ variant, onClose, onSaved }) {
                     </form>
                 </div>
 
-                {/* Success Toast */}
+                {/* Copy Design Modal */}
+            {showCopyDesignModal && (
+                <>
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                            zIndex: 70,
+                        }}
+                        onClick={() => setShowCopyDesignModal(false)}
+                    />
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '90%',
+                            maxWidth: '500px',
+                            backgroundColor: '#101827',
+                            borderRadius: '12px',
+                            border: '1px solid #1E293B',
+                            zIndex: 80,
+                            padding: '24px',
+                        }}
+                    >
+                        <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#F8FAFC', marginBottom: '16px' }}>
+                            Copy Design to Other Variants
+                        </h3>
+                        <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '20px' }}>
+                            Image dari variant ini akan di-copy ke variant yang dipilih. Pilih variant mana yang mau diberi design yang sama.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+                            {allVariants
+                                .filter(v => v.id !== variant.id)
+                                .map(v => (
+                                    <div
+                                        key={v.id}
+                                        onClick={() => {
+                                            setSelectedCopyTargets(prev => 
+                                                prev.includes(v.id) 
+                                                    ? prev.filter(id => id !== v.id)
+                                                    : [...prev, v.id]
+                                            );
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            padding: '12px',
+                                            backgroundColor: selectedCopyTargets.includes(v.id) ? '#1E293B' : '#0C1524',
+                                            border: `1px solid ${selectedCopyTargets.includes(v.id) ? '#3B82F6' : '#1E293B'}`,
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedCopyTargets.includes(v.id)}
+                                            onChange={() => {}}
+                                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                        />
+                                        {v.images?.length > 0 ? (
+                                            <img
+                                                src={v.images[0].startsWith('http') ? v.images[0] : `/storage/${v.images[0]}`}
+                                                alt={v.name}
+                                                style={{
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    borderRadius: '6px',
+                                                    objectFit: 'cover',
+                                                }}
+                                            />
+                                        ) : (
+                                            <div style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '6px',
+                                                backgroundColor: '#1E293B',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '10px',
+                                                color: '#64748B',
+                                            }}>
+                                                No Img
+                                            </div>
+                                        )}
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontSize: '14px', fontWeight: 500, color: '#F8FAFC', marginBottom: '4px' }}>
+                                                {v.name}
+                                            </p>
+                                            <p style={{ fontSize: '12px', color: '#94A3B8' }}>
+                                                SKU: {v.sku}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                            <button
+                                onClick={() => setShowCopyDesignModal(false)}
+                                disabled={copyingDesign}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px',
+                                    backgroundColor: '#1E293B',
+                                    color: '#94A3B8',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    cursor: copyingDesign ? 'not-allowed' : 'pointer',
+                                    opacity: copyingDesign ? 0.5 : 1,
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (selectedCopyTargets.length === 0) {
+                                        alert('Please select at least one variant');
+                                        return;
+                                    }
+                                    
+                                    handleCopyDesignToVariants(selectedCopyTargets);
+                                }}
+                                disabled={copyingDesign}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px',
+                                    backgroundColor: copyingDesign ? '#1E293B' : '#8B5CF6',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '13px',
+                                    fontWeight: 500,
+                                    cursor: copyingDesign ? 'not-allowed' : 'pointer',
+                                    opacity: copyingDesign ? 0.5 : 1,
+                                }}
+                            >
+                                {copyingDesign ? 'Copying...' : 'Copy Design'}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Copy Layout Modal */}
+            {showCopyModal && (
+                <>
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                            zIndex: 70,
+                        }}
+                        onClick={() => setShowCopyModal(false)}
+                    />
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '90%',
+                            maxWidth: '500px',
+                            backgroundColor: '#101827',
+                            borderRadius: '12px',
+                            border: '1px solid #1E293B',
+                            zIndex: 80,
+                            padding: '24px',
+                        }}
+                    >
+                        <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#F8FAFC', marginBottom: '16px' }}>
+                            Copy Layout from Variant
+                        </h3>
+                        <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '20px' }}>
+                            Designer akan otomatis gunakan layout (posisi, ukuran) dari variant yang dipilih. Anda tinggal ganti background/warna sesuai variant ini.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+                            {allVariants
+                                .filter(v => v.id !== variant.id && v.images?.length > 0)
+                                .map(v => (
+                                    <div
+                                        key={v.id}
+                                        onClick={() => {
+                                            window.open(`/admin/products/design/${productId}/variant/${variant.id}/image/new?copyFrom=${v.id}`, '_blank');
+                                            setShowCopyModal(false);
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            padding: '12px',
+                                            backgroundColor: '#0C1524',
+                                            border: '1px solid #1E293B',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            transition: 'border-color 0.2s',
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.borderColor = '#3B82F6'}
+                                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#1E293B'}
+                                    >
+                                        <img
+                                            src={v.images[0].startsWith('http') ? v.images[0] : `/storage/${v.images[0]}`}
+                                            alt={v.name}
+                                            style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '6px',
+                                                objectFit: 'cover',
+                                            }}
+                                        />
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontSize: '14px', fontWeight: 500, color: '#F8FAFC', marginBottom: '4px' }}>
+                                                {v.name}
+                                            </p>
+                                            <p style={{ fontSize: '12px', color: '#94A3B8' }}>
+                                                {v.images.length} image(s) • SKU: {v.sku}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                        </div>
+                        <button
+                            onClick={() => setShowCopyModal(false)}
+                            style={{
+                                marginTop: '20px',
+                                width: '100%',
+                                padding: '10px',
+                                backgroundColor: '#1E293B',
+                                color: '#94A3B8',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {/* Success Toast */}
                 {showSuccess && (
                     <div
                         style={{

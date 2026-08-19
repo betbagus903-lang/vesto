@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import AdminLayout from '../../../Components/Admin/AdminLayout';
 import ConfigurableAttributesModal from '../../../Components/Admin/ProductForms/ConfigurableAttributesModal';
 import { X, Package, Save } from 'lucide-react';
 
-export default function CreateProduct({ attributeFamilies, createdProduct: initialCreatedProduct }) {
+export default function CreateProduct({ attributeFamilies }) {
+  const { flash } = usePage().props;
+
   const [formData, setFormData] = useState({
     name: '',
     attribute_family_id: '',
@@ -13,10 +15,18 @@ export default function CreateProduct({ attributeFamilies, createdProduct: initi
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [createdProduct, setCreatedProduct] = useState(initialCreatedProduct || null);
+  const [createdProduct, setCreatedProduct] = useState(null);
   const [showConfigurableModal, setShowConfigurableModal] = useState(false);
 
-  // Show modal if product was just created and is configurable
+  // Show modal when flash.createdProduct arrives (after redirect from store())
+  useEffect(() => {
+    if (flash?.createdProduct && flash.createdProduct.type === 'configurable') {
+      setCreatedProduct(flash.createdProduct);
+      setShowConfigurableModal(true);
+    }
+  }, [flash?.createdProduct]);
+
+  // Also show modal if set via onSuccess (fallback)
   useEffect(() => {
     if (createdProduct && createdProduct.type === 'configurable') {
       setShowConfigurableModal(true);
@@ -29,21 +39,18 @@ export default function CreateProduct({ attributeFamilies, createdProduct: initi
     setErrors({});
 
     router.post('/admin/products', formData, {
-      onFinish: () => {
-        setLoading(false);
-      },
+      onFinish: () => setLoading(false),
       onSuccess: (page) => {
-        const product = page.props.createdProduct;
-        setCreatedProduct(product);
-        
-        // If configurable, show attributes modal (handled by useEffect)
-        if (formData.type !== 'configurable') {
-          // For other types, redirect to edit
-          router.visit(`/admin/products/${product.id}/edit`);
+        const product = page.props.flash?.createdProduct || page.props.createdProduct;
+        if (product) {
+          setCreatedProduct(product);
+          if (product.type !== 'configurable') {
+            router.visit(`/admin/products/${product.id}/edit`);
+          }
         }
       },
-      onError: (errors) => {
-        setErrors(errors);
+      onError: (errs) => {
+        setErrors(errs);
         setLoading(false);
       },
     });

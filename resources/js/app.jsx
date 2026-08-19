@@ -5,6 +5,7 @@ import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from './Context/ThemeContext';
+import { BuyerThemeProvider } from './Context/BuyerThemeContext';
 import { LanguageProvider } from './Context/LanguageContext';
 import { ToastProvider } from './Components/ToastProvider';
 
@@ -22,15 +23,18 @@ createInertiaApp({
 
         root.render(
             <ThemeProvider>
-                <LanguageProvider>
-                    <ToastProvider>
-                        <App {...props} />
-                    </ToastProvider>
-                </LanguageProvider>
+                <BuyerThemeProvider>
+                    <LanguageProvider>
+                        <ToastProvider>
+                            <App {...props} />
+                        </ToastProvider>
+                    </LanguageProvider>
+                </BuyerThemeProvider>
             </ThemeProvider>
         );
     },
     progress: {
         color: '#4B5563',
+        delay: 250,
     },
 });

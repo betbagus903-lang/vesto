@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Collection;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -26,11 +27,12 @@ class StorefrontController extends Controller
 
     public function home()
     {
-        $products = Product::where('status', true)
+        // Latest products
+        $latestProducts = Product::where('status', true)
             ->where('is_active', true)
             ->with('categories:id,name,slug')
             ->latest()
-            ->take(8)
+            ->take(16)
             ->get([
                 'id', 'name', 'slug', 'price', 'special_price',
                 'special_price_from', 'special_price_to',
@@ -38,10 +40,128 @@ class StorefrontController extends Controller
             ])
             ->map(fn($p) => $this->formatProduct($p));
 
+        // Best sellers
+        $bestSellers = $this->getBestSellers();
+
+        // Featured products
+        $featuredProducts = Product::where('status', true)
+            ->where('is_active', true)
+            ->where('is_featured', true)
+            ->with('categories:id,name,slug')
+            ->latest()
+            ->take(16)
+            ->get([
+                'id', 'name', 'slug', 'price', 'special_price',
+                'special_price_from', 'special_price_to',
+                'image', 'images', 'new', 'is_featured', 'status',
+            ])
+            ->map(fn($p) => $this->formatProduct($p));
+
+        // Home sections from collections with layout_type
+        $homeSections = Collection::whereNotNull('layout_type')
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', now());
+            })
+            ->orderBy('sort_order')
+            ->get()
+            ->map(function ($collection) {
+                return [
+                    'id' => $collection->id,
+                    'type' => $collection->layout_type,
+                    'title' => $collection->name,
+                    'subtitle' => $collection->description,
+                    'content' => $collection->content,
+                    'background_color' => $collection->background_color,
+                ];
+            });
+
+        // Get banners for home page
+        $heroBanners = \App\Models\Banner::active()
+            ->bySlot('home_hero')
+            ->sorted()
+            ->limit(5)
+            ->get()
+            ->map(fn($b) => [
+                'id' => $b->id,
+                'title' => $b->title,
+                'subtitle' => $b->subtitle,
+                'image' => $b->image,
+                'button_text' => $b->button_text,
+                'button_link' => $b->button_link,
+                'link_type' => $b->link_type,
+                'link_id' => $b->link_id,
+                'layout_json' => $b->layout_json,
+                'animations' => $b->animations,
+                'cta_style' => $b->cta_style,
+                'text_color' => $b->text_color,
+            ])
+            ->toArray();
+
+        $promoBanners = \App\Models\Banner::active()
+            ->bySlot('home_promo')
+            ->sorted()
+            ->limit(2)
+            ->get()
+            ->map(fn($b) => [
+                'id' => $b->id,
+                'title' => $b->title,
+                'subtitle' => $b->subtitle,
+                'image' => $b->image,
+                'button_text' => $b->button_text,
+                'button_link' => $b->button_link,
+                'link_type' => $b->link_type,
+                'link_id' => $b->link_id,
+                'layout_json' => $b->layout_json,
+            ])
+            ->toArray();
+
         return Inertia::render('Home', [
-            'products'   => $products,
-            'categories' => $this->navCategories(),
+            'latestProducts'    => $latestProducts,
+            'bestSellers'       => $bestSellers,
+            'featuredProducts'  => $featuredProducts,
+            'homeSections'      => $homeSections,
+            'categories'        => $this->navCategories(),
+            'heroBanners'       => $heroBanners,
+            'promoBanners'      => $promoBanners,
         ]);
+    }
+
+    // Best sellers method
+    private function getBestSellers()
+    {
+        $bestSellers = \App\Models\OrderItem::select('product_id')
+            ->selectRaw('SUM(quantity) as total_sold')
+            ->groupBy('product_id')
+            ->orderBy('total_sold', 'desc')
+            ->take(16)
+            ->pluck('product_id');
+
+        $bestSellerProducts = collect();
+        if ($bestSellers->isNotEmpty()) {
+            $bestSellerProducts = Product::whereIn('id', $bestSellers)
+                ->where('status', true)
+                ->where('is_active', true)
+                ->with('categories:id,name,slug')
+                ->whereIn('id', $bestSellers)
+                ->get([
+                    'id', 'name', 'slug', 'price', 'special_price',
+                    'special_price_from', 'special_price_to',
+                    'image', 'images', 'new', 'is_featured', 'status',
+                ])
+                ->map(fn($p) => $this->formatProduct($p))
+                ->sortBy(function($product) use ($bestSellers) {
+                    return array_search($product['id'], $bestSellers->toArray());
+                })
+                ->values();
+        }
+
+        return $bestSellerProducts;
     }
 
     public function shop(Request $request)
@@ -384,6 +504,30 @@ class StorefrontController extends Controller
             $canReview = $hasDeliveredOrder;
         }
 
+        // Get product questions with answers
+        $questions = \App\Models\ProductQuestion::with(['user', 'answeredBy'])
+            ->where('product_id', $product->id)
+            ->where('is_public', true)
+            ->latest()
+            ->get()
+            ->map(function ($question) {
+                return [
+                    'id' => $question->id,
+                    'question' => $question->question,
+                    'answer' => $question->answer,
+                    'created_at' => $question->created_at->format('M d, Y'),
+                    'answered_at' => $question->answered_at ? $question->answered_at->format('M d, Y') : null,
+                    'user' => [
+                        'id' => $question->user->id,
+                        'name' => $question->user->name,
+                    ],
+                    'answered_by' => $question->answeredBy ? [
+                        'id' => $question->answeredBy->id,
+                        'name' => $question->answeredBy->name,
+                    ] : null,
+                ];
+            });
+
         return Inertia::render('Product', [
             'product'    => $this->formatProduct($product, true),
             'variants'   => $variants,
@@ -392,6 +536,7 @@ class StorefrontController extends Controller
             'configurableAttributes' => $configurableAttributes,
             'reviews'    => $reviews,
             'canReview'  => $canReview,
+            'questions'  => $questions,
         ]);
     }
 

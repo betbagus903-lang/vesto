@@ -43,6 +43,16 @@ class CollectionController extends Controller
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'rules' => 'nullable|array',
+            'layout_type' => 'nullable|in:grid,carousel,hero,masonry,product_grid,featured_cards,lookbook,trending,style_guide,category_highlights,bold_collection,custom_grid',
+            'content' => 'nullable|array',
+            'background_color' => 'nullable|string',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after:start_date',
+            'cover_image' => 'nullable|string',
+            'badge' => 'nullable|in:new,summer,trending,limited,luxury,exclusive',
+            'color_theme' => 'nullable|string',
+            'visibility' => 'nullable|in:homepage,category,search,featured',
+            'publish_status' => 'nullable|in:draft,scheduled,published',
         ]);
 
         $collection = Collection::create([
@@ -52,6 +62,16 @@ class CollectionController extends Controller
             'type' => $validated['type'],
             'is_active' => $validated['is_active'] ?? true,
             'sort_order' => $validated['sort_order'] ?? 0,
+            'layout_type' => $validated['layout_type'] ?? null,
+            'content' => $validated['content'] ?? null,
+            'background_color' => $validated['background_color'] ?? '#ffffff',
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'cover_image' => $validated['cover_image'] ?? null,
+            'badge' => $validated['badge'] ?? null,
+            'color_theme' => $validated['color_theme'] ?? '#4F6BFF',
+            'visibility' => $validated['visibility'] ?? 'homepage',
+            'publish_status' => $validated['publish_status'] ?? 'draft',
         ]);
 
         // Create rules if provided
@@ -61,7 +81,7 @@ class CollectionController extends Controller
                     'collection_id' => $collection->id,
                     'field' => $ruleData['field'],
                     'operator' => $ruleData['operator'],
-                    'value' => isset($ruleData['value']) ? json_encode($ruleData['value']) : null,
+                    'value' => $ruleData['value'],
                     'logical_operator' => $ruleData['logical_operator'] ?? 'AND',
                     'sort_order' => $ruleData['sort_order'] ?? 0,
                 ]);
@@ -90,6 +110,16 @@ class CollectionController extends Controller
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'rules' => 'nullable|array',
+            'layout_type' => 'nullable|in:grid,carousel,hero,masonry,product_grid,featured_cards,lookbook,trending,style_guide,category_highlights,bold_collection,custom_grid',
+            'content' => 'nullable|array',
+            'background_color' => 'nullable|string',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after:start_date',
+            'cover_image' => 'nullable|string',
+            'badge' => 'nullable|in:new,summer,trending,limited,luxury,exclusive',
+            'color_theme' => 'nullable|string',
+            'visibility' => 'nullable|in:homepage,category,search,featured',
+            'publish_status' => 'nullable|in:draft,scheduled,published',
         ]);
 
         $collection->update([
@@ -99,6 +129,16 @@ class CollectionController extends Controller
             'type' => $validated['type'],
             'is_active' => $validated['is_active'] ?? true,
             'sort_order' => $validated['sort_order'] ?? 0,
+            'layout_type' => $validated['layout_type'] ?? null,
+            'content' => $validated['content'] ?? null,
+            'background_color' => $validated['background_color'] ?? '#ffffff',
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'cover_image' => $validated['cover_image'] ?? null,
+            'badge' => $validated['badge'] ?? null,
+            'color_theme' => $validated['color_theme'] ?? '#4F6BFF',
+            'visibility' => $validated['visibility'] ?? 'homepage',
+            'publish_status' => $validated['publish_status'] ?? 'draft',
         ]);
 
         // Delete existing rules
@@ -111,7 +151,7 @@ class CollectionController extends Controller
                     'collection_id' => $collection->id,
                     'field' => $ruleData['field'],
                     'operator' => $ruleData['operator'],
-                    'value' => isset($ruleData['value']) ? json_encode($ruleData['value']) : null,
+                    'value' => $ruleData['value'],
                     'logical_operator' => $ruleData['logical_operator'] ?? 'AND',
                     'sort_order' => $ruleData['sort_order'] ?? 0,
                 ]);

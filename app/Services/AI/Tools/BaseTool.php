@@ -49,7 +49,7 @@ abstract class BaseTool
     }
 
     /**
-     * Format tool for Gemini API
+     * Format tool for Gemini API (and Mistral API)
      */
     public function toGeminiFormat(): array
     {
@@ -70,6 +70,12 @@ abstract class BaseTool
             if (!empty($required)) {
                 $format['parameters']['required'] = $required;
             }
+        } else {
+            // If no parameters, provide empty object schema
+            $format['parameters'] = [
+                'type' => 'object',
+                'properties' => new \stdClass(),
+            ];
         }
 
         return $format;

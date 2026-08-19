@@ -1,5 +1,130 @@
-import { Link, usePage, router } from '@inertiajs/react';
-import { useState, useRef } from 'react';
+import { Link, router } from '@inertiajs/react';
+import { useState, useEffect, useRef } from 'react';
+import {
+    Heart, Star, Truck, RotateCcw, ShieldCheck, Headphones, ArrowRight, ChevronRight, Package, Shirt,
+    Footprints, Watch, SprayCan, Zap, Sparkles, Grid3X3, List, ShoppingBag, Sun, Moon,
+} from 'lucide-react';
+import Navbar from '../Components/Shared/Navbar';
+import { useTheme } from '../Context/ThemeContext';
+
+/* ── Scroll Animation Hook ───────────────────────────────────── */
+function useScrollAnimation(threshold = 0.1) {
+    const [isVisible, setIsVisible] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setIsVisible(true);
+                    observer.unobserve(entry.target);
+                }
+            },
+            { threshold }
+        );
+
+        if (ref.current) {
+            observer.observe(ref.current);
+        }
+
+        return () => {
+            if (ref.current) {
+                observer.unobserve(ref.current);
+            }
+        };
+    }, [threshold]);
+
+    return [ref, isVisible];
+}
+
+/* ── Theme Constants ───────────────────────────────────── */
+const THEME = {
+    background: '#FFFFFF',
+    black: '#000000',
+    card: '#F8F9FA',
+    secondaryCard: '#E9ECEF',
+    border: 'rgba(0,0,0,0.1)',
+    primaryBlue: '#4F6BFF',
+    purple: '#6C63FF',
+    white: '#FFFFFF',
+    secondaryText: '#495057',
+    muted: '#6C757D',
+    danger: '#EF4444',
+};
+
+/* ── Animation Keyframes (injected via style) ───────────────────────────────────── */
+const animationStyles = `
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes fadeInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes scaleIn {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes float {
+        0%, 100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @keyframes pulse-glow {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(79, 107, 255, 0.3);
+        }
+        50% {
+            box-shadow: 0 0 40px rgba(79, 107, 255, 0.6);
+        }
+    }
+
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+        100% {
+            background-position: 200% 0;
+        }
+    }
+`;
 
 /* ── Helpers ───────────────────────────────────────────── */
 function fmt(value) {
@@ -8,520 +133,1082 @@ function fmt(value) {
     }).format(value ?? 0);
 }
 
-function ProductImage({ src, alt }) {
-    const [err, setErr] = useState(false);
-    if (!src || err) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                <svg className="w-14 h-14 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-            </div>
-        );
-    }
-    return <img src={src} alt={alt} className="w-full h-full object-cover" onError={() => setErr(true)} />;
+function useCountdown(initial) {
+    const [time, setTime] = useState(initial);
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTime(prev => {
+                let { days, hours, minutes, seconds } = prev;
+                if (seconds > 0) seconds--;
+                else if (minutes > 0) { minutes--; seconds = 59; }
+                else if (hours > 0) { hours--; minutes = 59; seconds = 59; }
+                else if (days > 0) { days--; hours = 23; minutes = 59; seconds = 59; }
+                return { days, hours, minutes, seconds };
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+    return time;
 }
 
-/* ── Navbar ────────────────────────────────────────────── */
-function Navbar({ categories, auth }) {
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-    const [mobileOpen, setMobileOpen]     = useState(false);
+const FALLBACK_CATEGORIES = [
+    { name: 'T-Shirts', slug: 't-shirts', icon: Shirt },
+    { name: 'Hoodies', slug: 'hoodies', icon: Shirt },
+    { name: 'Shirts', slug: 'shirts', icon: Shirt },
+    { name: 'Pants', slug: 'pants', icon: Package },
+    { name: 'Shoes', slug: 'shoes', icon: Footprints },
+    { name: 'Accessories', slug: 'accessories', icon: Watch },
+    { name: 'Bags', slug: 'bags', icon: ShoppingBag },
+    { name: 'Perfume', slug: 'perfume', icon: SprayCan },
+];
 
-    return (
-        <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
-            <div className="px-6 lg:px-20">
-                <div className="flex items-center justify-between h-16">
-                    {/* Logo + Nav links */}
-                    <div className="flex items-center gap-10">
-                        <Link href="/" className="text-2xl font-black tracking-widest text-gray-900">VESTO</Link>
-                        <div className="hidden md:flex items-center gap-8">
-                            <Link href="/shop" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                                All
-                            </Link>
-                            {categories.map(cat => (
-                                <Link
-                                    key={cat.slug}
-                                    href={`/shop?category=${cat.slug}`}
-                                    className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                                >
-                                    {cat.name}
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
+const NAV_LINKS_FALLBACK = [
+    { id: 'men', name: 'Men', slug: 'men' },
+    { id: 'women', name: 'Women', slug: 'women' },
+    { id: 'shoes', name: 'Shoes', slug: 'shoes' },
+    { id: 'accessories', name: 'Accessories', slug: 'accessories' },
+    { id: 'collections', name: 'Collections', slug: 'collections' },
+    { id: 'sale', name: 'Sale', slug: 'sale' },
+];
 
-                    {/* Right icons */}
-                    <div className="flex items-center gap-4">
-                        {/* Search */}
-                        <Link href="/shop" className="text-gray-500 hover:text-gray-900 transition-colors">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
-                            </svg>
-                        </Link>
-
-                        {/* Wishlist */}
-                        <button className="text-gray-500 hover:text-gray-900 transition-colors">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                        </button>
-
-                        {/* Auth */}
-                        {auth?.user ? (
-                            <div className="relative">
-                                <button
-                                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                                    className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-black"
-                                >
-                                    {auth.user.name.charAt(0).toUpperCase()}
-                                </button>
-                                {dropdownOpen && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-100 rounded-2xl shadow-lg py-2 z-50">
-                                        <div className="px-4 py-3 border-b border-gray-100">
-                                            <p className="text-xs font-black text-gray-900 truncate">{auth.user.name}</p>
-                                            <p className="text-xs text-gray-400 truncate">{auth.user.email}</p>
-                                        </div>
-                                        <div className="py-1">
-                                            <Link href="/buyer/dashboard" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                                                My Account
-                                            </Link>
-                                        </div>
-                                        <div className="border-t border-gray-100 py-1">
-                                            <Link href="/logout" method="post" as="button"
-                                                className="block w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
-                                                Logout
-                                            </Link>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-3">
-                                <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-                                    Login
-                                </Link>
-                                <Link href="/register" className="text-sm font-semibold bg-gray-900 text-white px-4 py-2 rounded-full hover:bg-gray-700 transition-colors">
-                                    Register
-                                </Link>
-                            </div>
-                        )}
-
-                        {/* Mobile toggle */}
-                        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden text-gray-500">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Mobile menu */}
-                {mobileOpen && (
-                    <div className="md:hidden py-3 border-t border-gray-100 space-y-1">
-                        <Link href="/shop" className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg">All</Link>
-                        {categories.map(cat => (
-                            <Link key={cat.slug} href={`/shop?category=${cat.slug}`}
-                                className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg">
-                                {cat.name}
-                            </Link>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </nav>
-    );
-}
-
-/* ── Product Card ──────────────────────────────────────── */
-function ProductCard({ product }) {
+/* ── Product Card ───────────────────────────────────────── */
+function ProductCard({ product, badgeType = 'discount', theme = 'light', delay = 0 }) {
+    const [isWishlisted, setIsWishlisted] = useState(false);
     const displayPrice = product.special_price ?? product.price;
-    const hasDiscount  = !!product.special_price;
+    const hasDiscount = !!product.special_price;
+    const discountPct = hasDiscount ? Math.round((1 - product.special_price / product.price) * 100) : 0;
+    const isNew = badgeType === 'new';
+
+    const currentTheme = theme === 'dark' ? {
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+    } : {
+        card: '#F8F9FA',
+        border: '#E9ECEF',
+        white: '#1A1A1A',
+        secondaryText: '#6C757D',
+        muted: '#6C757D',
+    };
 
     return (
-        <Link href={`/products/${product.slug}`} className="group cursor-pointer block">
-            <div className="bg-gray-50 rounded-lg overflow-hidden mb-4 relative aspect-[3/4]">
-                <ProductImage src={product.image} alt={product.name} />
-
-                {/* Badges - Minimalist */}
-                <div className="absolute top-3 left-3 flex flex-col gap-1">
-                    {hasDiscount && (
-                        <span className="bg-black text-white text-[10px] font-medium px-2 py-1 rounded-sm tracking-wide">SALE</span>
+        <div 
+            className="group"
+            style={{
+                animation: `fadeInUp 0.6s ease-out ${delay}ms both`,
+                opacity: 0
+            }}
+        >
+            <div className="relative rounded-2xl overflow-hidden mb-3 aspect-square transition-all duration-500 hover:shadow-xl hover:-translate-y-2" style={{ backgroundColor: currentTheme.card, border: `1px solid ${currentTheme.border}` }}>
+                <Link href={`/products/${product.slug}`} className="block w-full h-full">
+                    {product.image ? (
+                        <img
+                            src={product.image}
+                            alt={product.name}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                            <Package size={36} style={{ color: currentTheme.muted }} />
+                        </div>
                     )}
-                    {product.is_new && (
-                        <span className="bg-gray-900 text-white text-[10px] font-medium px-2 py-1 rounded-sm tracking-wide">NEW</span>
-                    )}
-                </div>
+                </Link>
 
-                {/* Quick View - Minimalist */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <span className="text-white text-xs font-medium tracking-widest uppercase">Quick View</span>
-                </div>
-            </div>
-
-            {/* Info - Clean typography */}
-            <p className="text-xs text-gray-400 mb-1 tracking-wide uppercase">
-                {product.categories?.[0]?.name ?? ''}
-            </p>
-            <p className="font-medium text-gray-900 text-sm mb-2 line-clamp-2 leading-relaxed">{product.name}</p>
-            <div className="flex items-center gap-2">
-                <p className="font-normal text-gray-900 text-sm">{fmt(displayPrice)}</p>
-                {hasDiscount && (
-                    <p className="text-xs text-gray-400 line-through">{fmt(product.price)}</p>
+                {(isNew || hasDiscount) && (
+                    <span
+                        className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-md tracking-wide pointer-events-none animate-pulse"
+                        style={{ backgroundColor: isNew ? THEME.primaryBlue : THEME.danger, color: '#FFFFFF' }}
+                    >
+                        {isNew ? 'NEW' : `-${discountPct}%`}
+                    </span>
                 )}
+
+                <button
+                    onClick={(e) => { e.preventDefault(); setIsWishlisted(!isWishlisted); }}
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-300 hover:scale-110 hover:rotate-12"
+                    style={{ backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.9)' }}
+                    aria-label="Toggle wishlist"
+                >
+                    <Heart size={14} className={`transition-all duration-300 ${isWishlisted ? 'fill-red-500 text-red-500 scale-125' : (theme === 'dark' ? 'text-white' : 'text-gray-800')}`} />
+                </button>
+
+                {/* Quick View Overlay */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                    <button className="px-4 py-2 bg-white text-gray-900 rounded-lg text-sm font-semibold transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        Quick View
+                    </button>
+                </div>
             </div>
-        </Link>
+
+            <Link href={`/products/${product.slug}`} className="block">
+                <h3 className="text-sm font-semibold truncate transition-colors duration-300 hover:text-blue-500" style={{ color: currentTheme.white }}>{product.name}</h3>
+            </Link>
+            <p className="text-xs mb-1.5" style={{ color: currentTheme.secondaryText }}>
+                {product.categories?.[0]?.name ?? 'Collection'}
+            </p>
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-bold truncate transition-colors duration-300" style={{ color: currentTheme.white }}>{fmt(displayPrice)}</span>
+                    {hasDiscount && (
+                        <span className="text-xs line-through shrink-0" style={{ color: currentTheme.muted }}>{fmt(product.price)}</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    <Star size={12} className="fill-yellow-400 text-yellow-400 transition-transform duration-300 hover:scale-125" />
+                    <span className="text-xs" style={{ color: currentTheme.muted }}>{product.rating ?? '4.7'}</span>
+                </div>
+            </div>
+        </div>
     );
 }
 
-/* ── Main Page ─────────────────────────────────────────── */
-export default function Home({ products = [], categories = [] }) {
-    const { auth } = usePage().props;
 
-    return (
-        <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
+/* ── Hero Banner Slider ───────────────────────────────────── */
+function HeroBannerSlider({ banners = [], theme = 'light' }) {
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [isAnimating, setIsAnimating] = useState(false);
+    const bannerRef = useRef(null);
 
-            {/* Top Bar */}
-            <div className="bg-gray-900 text-white text-center py-2.5 text-xs tracking-widest font-medium">
-                FREE SHIPPING ON ORDERS ABOVE RP200.000 &nbsp;·&nbsp; NEW COLLECTION 2026
-            </div>
-
-            <Navbar categories={categories} auth={auth} />
-
-            {/* Hero Banner */}
-            <section className="relative overflow-hidden flex items-center"
-                style={{ background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)', height: '80vh' }}>
-                <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 flex flex-col md:flex-row items-center justify-between gap-16">
-                    <div className="max-w-xl">
-                        <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase block mb-8">Spring / Summer 2026</span>
-                        <h1 className="text-7xl md:text-8xl font-thin text-white leading-none mb-10 tracking-wider">
-                            The Art of<br />
-                            <span className="font-light">Simplicity</span>
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        secondaryCard: '#161F2F',
+        border: 'rgba(255,255,255,0.08)',
+        primaryBlue: '#4F6BFF',
+        purple: '#6C63FF',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+        danger: '#EF4444',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        secondaryCard: '#E9ECEF',
+        border: 'rgba(0,0,0,0.1)',
+        primaryBlue: '#4F6BFF',
+        purple: '#6C63FF',
+        white: '#FFFFFF',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+        danger: '#EF4444',
+    };
+    
+    if (!banners || banners.length === 0) {
+        // Fallback to static hero if no banners
+        return (
+            <section className="relative overflow-hidden w-full" style={{ background: `linear-gradient(160deg, ${currentTheme.background} 0%, ${currentTheme.card} 60%, ${currentTheme.secondaryCard} 100%)` }}>
+                <div className="px-4 md:px-6 lg:px-16 py-10 md:py-16 lg:py-20">
+                    <div>
+                        <span className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-[0.2em] uppercase px-4 py-2 rounded-full mb-6" style={{ backgroundColor: 'rgba(79,107,255,0.1)', color: currentTheme.primaryBlue, border: '1px solid rgba(79,107,255,0.3)' }}>
+                            <Sparkles size={13} /> New Collection
+                        </span>
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-[1.05] mb-5" style={{ color: currentTheme.white }}>
+                            Elevate Your<br />Style, Define You
                         </h1>
-                        <p className="text-gray-300 text-sm mb-12 leading-loose max-w-md font-light tracking-wide">
-                            Curated essentials for the modern individual. Where minimalism meets sophistication.
+                        <p className="text-sm md:text-base lg:text-lg mb-8 max-w-2xl leading-relaxed" style={{ color: currentTheme.secondaryText }}>
+                            Discover the latest trends in fashion and express your unique style with VESTO.
                         </p>
-                        <div className="flex gap-6">
-                            <Link href="/shop"
-                                className="bg-white text-gray-900 font-light text-xs px-12 py-5 rounded-sm hover:bg-gray-100 transition-colors tracking-[0.2em] uppercase">
+                        <div className="flex flex-wrap items-center gap-4 mb-8">
+                            <button 
+                                onClick={() => router.visit('/shop')}
+                                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-bold cursor-pointer" 
+                                style={{ background: `linear-gradient(135deg, ${currentTheme.primaryBlue}, ${currentTheme.purple})`, color: '#FFFFFF' }}
+                            >
+                                Shop Now <ArrowRight size={16} />
+                            </button>
+                            <Link href="/collections" className="px-7 py-3.5 rounded-xl text-sm font-bold" style={{ border: `1px solid ${currentTheme.border}`, color: currentTheme.white }}>
                                 Explore Collection
                             </Link>
-                            <a href="#categories"
-                                className="border border-gray-600 text-white font-light text-xs px-12 py-5 rounded-sm hover:border-white transition-colors tracking-[0.2em] uppercase">
-                                Discover More
-                            </a>
-                        </div>
-                    </div>
-                    <div className="hidden md:flex w-96 h-[500px] rounded-lg items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div className="text-center">
-                            <div className="w-24 h-24 border border-gray-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <svg className="w-12 h-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2a2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">Hero Image</p>
                         </div>
                     </div>
                 </div>
             </section>
+        );
+    }
 
-            {/* Categories */}
-            {categories.length > 0 && (
-                <section id="categories" className="py-16 bg-white">
-                    <div className="px-6 lg:px-20">
-                        <div className="flex justify-center">
-                            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                                {categories.map((cat, i) => (
-                                    <Link
-                                        key={cat.slug}
-                                        href={`/shop?category=${cat.slug}`}
-                                        className="flex flex-col items-center gap-3 cursor-pointer group"
-                                    >
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center overflow-hidden group-hover:scale-110 transition-transform duration-300 ${i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-100'}`}>
-                                            {cat.logo_path ? (
-                                                <img src={`/storage/${cat.logo_path}`} alt={cat.name}
-                                                    className="w-8 h-8 object-contain" />
-                                            ) : (
-                                                <svg className={`w-8 h-8 ${i % 2 === 0 ? 'text-gray-600' : 'text-gray-400'}`}
-                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a6a2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
-                                            )}
-                                        </div>
-                                        <p className={`font-black text-xs text-center ${i % 2 === 0 ? 'text-gray-900' : 'text-gray-900'}`}>{cat.name}</p>
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
+    const currentBanner = banners[activeIndex];
+    const hasAnimations = currentBanner?.animations && currentBanner.animations.length > 0;
+
+    // Auto-advance carousel
+    useEffect(() => {
+        if (banners.length <= 1) return;
+        const interval = setInterval(() => {
+            setActiveIndex(prev => (prev + 1) % banners.length);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [banners.length]);
+
+    // Apply animations when banner changes
+    useEffect(() => {
+        if (!hasAnimations || !bannerRef.current) return;
+        
+        const container = bannerRef.current;
+        const animations = currentBanner.animations;
+        
+        // Reset all animated elements
+        const animatedElements = container.querySelectorAll('[data-anim-id]');
+        animatedElements.forEach(el => {
+            el.style.transition = 'none';
+            el.style.opacity = '1';
+            el.style.transform = 'none';
+        });
+        
+        // Apply animations
+        animations.forEach(anim => {
+            const element = container.querySelector(`[data-anim-id="${anim.objectId}"]`);
+            if (!element) return;
+            
+            const easing = anim.easing || 'ease-in-out';
+            const duration = anim.duration || 1000;
+            const delay = anim.delay || 0;
+            
+            element.style.transition = `all ${duration}ms ${easing} ${delay}ms`;
+            
+            // Apply initial state based on preset
+            switch (anim.preset) {
+                case 'fade':
+                    element.style.opacity = '0';
+                    setTimeout(() => element.style.opacity = '1', delay);
+                    break;
+                case 'slideLeft':
+                    element.style.transform = 'translateX(-100%)';
+                    setTimeout(() => element.style.transform = 'translateX(0)', delay);
+                    break;
+                case 'slideRight':
+                    element.style.transform = 'translateX(100%)';
+                    setTimeout(() => element.style.transform = 'translateX(0)', delay);
+                    break;
+                case 'slideUp':
+                    element.style.transform = 'translateY(100%)';
+                    setTimeout(() => element.style.transform = 'translateY(0)', delay);
+                    break;
+                case 'slideDown':
+                    element.style.transform = 'translateY(-100%)';
+                    setTimeout(() => element.style.transform = 'translateY(0)', delay);
+                    break;
+                case 'bounce':
+                    element.style.transform = 'scale(0)';
+                    setTimeout(() => element.style.transform = 'scale(1.1)', delay);
+                    setTimeout(() => element.style.transform = 'scale(1)', delay + duration * 0.5);
+                    break;
+                case 'rotate':
+                    element.style.transform = 'rotate(-180deg) scale(0)';
+                    setTimeout(() => element.style.transform = 'rotate(0) scale(1)', delay);
+                    break;
+                case 'scale':
+                    element.style.transform = 'scale(0)';
+                    setTimeout(() => element.style.transform = 'scale(1)', delay);
+                    break;
+                case 'positionSwap':
+                    element.style.transform = 'translateX(0)';
+                    setTimeout(() => element.style.transform = 'translateX(200px)', delay);
+                    setTimeout(() => element.style.transform = 'translateX(0)', delay + duration * 0.5);
+                    break;
+                case 'parallax':
+                    element.style.transform = 'translateY(0)';
+                    setTimeout(() => element.style.transform = 'translateY(-50px)', delay);
+                    setTimeout(() => element.style.transform = 'translateY(0)', delay + duration * 0.5);
+                    break;
+            }
+        });
+        
+        setIsAnimating(true);
+        const maxDuration = Math.max(...animations.map(a => a.duration + a.delay), 2000);
+        setTimeout(() => setIsAnimating(false), maxDuration);
+        
+    }, [activeIndex, hasAnimations, currentBanner]);
+
+    return (
+        <section className="relative overflow-hidden w-full">
+            <div ref={bannerRef} className="relative w-full overflow-hidden" style={{ aspectRatio: '2.4/1', backgroundColor: currentTheme.card }}>
+                {currentBanner?.image ? (
+                    <img 
+                        src={currentBanner.image.startsWith('http') ? currentBanner.image : `/storage/${currentBanner.image}`} 
+                        alt={currentBanner.title || 'Banner'} 
+                        className="w-full h-full object-cover"
+                        data-anim-id="banner-image"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: currentTheme.card }}>
+                        <Package size={64} style={{ color: currentTheme.muted }} />
                     </div>
-                </section>
+                )}
+                
+                {/* Banner Content Overlay */}
+                {currentBanner && (
+                    <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 lg:px-16" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)' }}>
+                        {currentBanner.subtitle && (
+                            <p 
+                                data-anim-id="banner-subtitle"
+                                className="text-xs md:text-sm font-medium mb-2 tracking-wide uppercase opacity-80" 
+                                style={{ color: currentBanner.text_color || '#FFFFFF' }}
+                            >
+                                {currentBanner.subtitle}
+                            </p>
+                        )}
+                        {currentBanner.title && (
+                            <h2 
+                                data-anim-id="banner-title"
+                                className="text-2xl md:text-4xl lg:text-5xl font-bold mb-4" 
+                                style={{ color: currentBanner.text_color || '#FFFFFF' }}
+                            >
+                                {currentBanner.title}
+                            </h2>
+                        )}
+                        {currentBanner.button_text && (
+                            <Link 
+                                data-anim-id="banner-button"
+                                href={currentBanner.button_link || '#'} 
+                                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold w-fit"
+                                style={{ 
+                                    backgroundColor: currentBanner.cta_style === 'filled_blue' ? currentTheme.primaryBlue : 
+                                                   currentBanner.cta_style === 'filled_dark' ? 'rgba(0,0,0,0.6)' :
+                                                   currentBanner.cta_style === 'outline' ? 'transparent' :
+                                                   'transparent',
+                                    border: currentBanner.cta_style === 'outline' ? '2px solid white' : 'none',
+                                    color: currentBanner.text_color || '#FFFFFF'
+                                }}
+                            >
+                                {currentBanner.button_text} <ArrowRight size={16} />
+                            </Link>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Carousel Dots */}
+            {banners.length > 1 && (
+                <div className="flex items-center gap-2 mt-4 justify-center px-4">
+                    {banners.map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => setActiveIndex(i)}
+                            aria-label={`Banner ${i + 1}`}
+                            className="h-1.5 rounded-full transition-all"
+                            style={{ width: activeIndex === i ? '24px' : '8px', backgroundColor: activeIndex === i ? THEME.primaryBlue : THEME.border }}
+                        />
+                    ))}
+                </div>
             )}
+        </section>
+    );
+}
 
-            {/* Products Grid */}
-            <section id="products" className="py-24 bg-white">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase mb-4 block">New Arrivals</span>
-                        <h2 className="text-5xl font-thin text-gray-900 tracking-wider">Latest Collection</h2>
-                        <div className="w-12 h-px bg-gray-200 mx-auto mt-8"></div>
-                    </div>
+/* ── Category Strip ────────────────────────────────────── */
+function CategoryStrip({ categories, theme = 'light' }) {
+    const [ref, isVisible] = useScrollAnimation(0.1);
+    const list = categories?.length
+        ? categories.slice(0, 8).map(c => ({ name: c.name, slug: c.slug, icon: Package }))
+        : FALLBACK_CATEGORIES;
 
-                    {products.length === 0 ? (
-                        <div className="text-center py-20">
-                            <p className="text-gray-400 text-sm font-light">No products available yet.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
-                            {products.map(product => (
-                                <ProductCard key={product.id} product={product} />
-                            ))}
-                        </div>
-                    )}
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        primaryBlue: '#4F6BFF',
+        purple: '#6C63FF',
+        secondaryText: '#A8B3CF',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        border: 'rgba(0,0,0,0.1)',
+        primaryBlue: '#4F6BFF',
+        purple: '#6C63FF',
+        secondaryText: '#6C757D',
+    };
 
-                    <div className="text-center mt-16">
-                        <Link href="/shop" className="inline-block text-xs font-light text-gray-900 border border-gray-300 px-14 py-4 rounded-sm hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all duration-300 tracking-[0.2em] uppercase">
-                            View All
+    return (
+        <section 
+            ref={ref}
+            className="py-10 transition-all duration-700"
+            style={{ 
+                backgroundColor: currentTheme.background, 
+                borderBottom: `1px solid ${currentTheme.border}`,
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+            }}
+        >
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                <div className="grid grid-cols-4 md:flex md:items-center md:justify-between gap-y-6 gap-x-3">
+                    {list.map((cat, i) => (
+                        <Link 
+                            key={cat.slug ?? i} 
+                            href={`/shop?category=${cat.slug}`} 
+                            className="flex flex-col items-center gap-2 group"
+                            style={{
+                                animation: isVisible ? `fadeInUp 0.5s ease-out ${i * 100}ms both` : 'none',
+                                opacity: 0
+                            }}
+                        >
+                            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg" style={{ backgroundColor: currentTheme.card, border: `1px solid ${currentTheme.border}` }}>
+                                <cat.icon size={22} style={{ color: currentTheme.secondaryText }} />
+                            </div>
+                            <span className="text-[11px] font-medium text-center transition-colors duration-300 group-hover:text-blue-500" style={{ color: currentTheme.secondaryText }}>{cat.name}</span>
                         </Link>
-                    </div>
+                    ))}
+                    <Link 
+                        href="/shop" 
+                        className="hidden md:flex w-16 h-16 rounded-full items-center justify-center shrink-0 transition-all duration-300 hover:scale-110 hover:shadow-lg" 
+                        style={{ background: `linear-gradient(135deg, ${currentTheme.primaryBlue}, ${currentTheme.purple})` }} 
+                        aria-label="View all categories"
+                    >
+                        <ArrowRight size={20} className="text-white" />
+                    </Link>
                 </div>
-            </section>
+            </div>
+        </section>
+    );
+}
 
-            {/* Lookbook Section */}
-            <section className="py-24 bg-white">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase mb-4 block">Lookbook</span>
-                        <h2 className="text-5xl font-thin text-gray-900 tracking-wider">Summer 2026</h2>
-                        <div className="w-12 h-px bg-gray-200 mx-auto mt-8"></div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="col-span-2 row-span-2 relative aspect-square bg-gray-100 overflow-hidden group cursor-pointer">
-                            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors duration-300 flex items-end p-8">
-                                <div>
-                                    <p className="text-white text-[10px] tracking-[0.3em] uppercase mb-2 font-light">Editorial</p>
-                                    <h3 className="text-white text-3xl font-thin tracking-wide">Urban Minimalist</h3>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="aspect-square bg-gray-100 relative overflow-hidden group cursor-pointer">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center">
-                                <span className="text-white text-[10px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity font-light">Street Style</span>
-                            </div>
-                        </div>
-                        <div className="aspect-square bg-gray-100 relative overflow-hidden group cursor-pointer">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center">
-                                <span className="text-white text-[10px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity font-light">Casual Chic</span>
-                            </div>
-                        </div>
-                        <div className="aspect-square bg-gray-100 relative overflow-hidden group cursor-pointer">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center">
-                                <span className="text-white text-[10px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity font-light">Evening Wear</span>
-                            </div>
-                        </div>
-                        <div className="aspect-square bg-gray-100 relative overflow-hidden group cursor-pointer">
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center">
-                                <span className="text-white text-[10px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity font-light">Office Ready</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="text-center mt-12">
-                        <Link href="/shop" className="inline-block text-xs font-light text-gray-900 border-b border-gray-900 pb-1 hover:text-gray-600 hover:border-gray-600 transition-colors tracking-[0.2em] uppercase">
-                            View Full Lookbook
-                        </Link>
-                    </div>
-                </div>
-            </section>
+/* ── Feature Strip ──────────────────────────────────────── */
+function FeatureStrip({ theme = 'light' }) {
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        primaryBlue: '#4F6BFF',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        border: 'rgba(0,0,0,0.1)',
+        primaryBlue: '#4F6BFF',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+    };
 
-            {/* Trending Now */}
-            <section className="py-24 bg-gray-50">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="flex items-end justify-between mb-12">
-                        <div>
-                            <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase mb-4 block">Trending</span>
-                            <h2 className="text-4xl font-thin text-gray-900 tracking-wider">Now</h2>
-                        </div>
-                        <Link href="/shop" className="text-xs font-light text-gray-900 border-b border-gray-900 pb-1 hover:text-gray-600 hover:border-gray-600 transition-colors hidden md:block tracking-[0.2em] uppercase">
-                            Shop All
-                        </Link>
-                    </div>
-                    <div className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide">
-                        {[
-                            { name: 'Oversized Tees', count: '124 items' },
-                            { name: 'Wide Leg Pants', count: '89 items' },
-                            { name: 'Minimalist Jackets', count: '67 items' },
-                            { name: 'Chunky Sneakers', count: '156 items' },
-                            { name: 'Linen Shirts', count: '98 items' },
-                        ].map((trend, i) => (
-                            <Link key={i} href="/shop" className="flex-shrink-0 w-52 bg-white p-8 rounded-lg hover:shadow-lg transition-shadow group">
-                                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-6 group-hover:bg-gray-900 transition-colors">
-                                    <svg className="w-6 h-6 text-gray-600 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                    </svg>
-                                </div>
-                                <h3 className="font-light text-gray-900 text-sm mb-2 tracking-wide">{trend.name}</h3>
-                                <p className="text-[10px] text-gray-500 font-light tracking-wide">{trend.count}</p>
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Style Guide */}
-            <section className="py-24 bg-white">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase mb-4 block">Style Guide</span>
-                        <h2 className="text-5xl font-thin text-gray-900 tracking-wider">How to Wear</h2>
-                        <div className="w-12 h-px bg-gray-200 mx-auto mt-8"></div>
-                    </div>
-                    <div className="grid md:grid-cols-3 gap-10">
-                        {[
-                            { title: 'Casual Friday', desc: 'Relaxed yet polished. Pair our linen shirts with tailored shorts for effortless weekend vibes.', items: '3 looks' },
-                            { title: 'Office Chic', desc: 'Elevate your work wardrobe with structured blazers and clean-cut trousers. Professional meets modern.', items: '5 looks' },
-                            { title: 'Weekend Warrior', desc: 'From brunch to beach. Versatile pieces that transition seamlessly from day to night.', items: '4 looks' },
-                        ].map((guide, i) => (
-                            <Link key={i} href="/shop" className="group">
-                                <div className="aspect-[3/4] bg-gray-100 rounded-lg mb-6 overflow-hidden relative">
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
-                                        <span className="text-white text-[10px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity font-light">View Looks</span>
-                                    </div>
-                                </div>
-                                <h3 className="font-light text-gray-900 text-xl mb-3 tracking-wide">{guide.title}</h3>
-                                <p className="text-gray-600 text-sm leading-loose mb-4 font-light tracking-wide">{guide.desc}</p>
-                                <p className="text-[10px] text-gray-400 font-light tracking-wide">{guide.items}</p>
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Category Highlights */}
-            <section className="py-24 bg-gray-50">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase mb-4 block">Collections</span>
-                        <h2 className="text-5xl font-thin text-gray-900 tracking-wider">Shop by Category</h2>
-                        <div className="w-12 h-px bg-gray-200 mx-auto mt-8"></div>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-8">
-                        {categories.slice(0, 4).map((cat, i) => (
-                            <Link key={cat.slug} href={`/shop?category=${cat.slug}`} className="group relative aspect-[16/9] bg-gray-200 overflow-hidden rounded-lg">
-                                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors duration-300 flex items-center justify-center">
-                                    <div className="text-center">
-                                        <h3 className="text-white text-3xl font-thin mb-3 tracking-wide">{cat.name}</h3>
-                                        <span className="text-white text-[10px] tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-opacity font-light">Shop Now</span>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Bold Collections Banner */}
-            <section className="py-32 bg-gray-900">
-                <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
-                    <div className="w-full h-96 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden">
-                        <div className="text-center">
-                            <div className="w-24 h-24 border border-gray-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <svg className="w-12 h-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2a2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
+    const features = [
+        { icon: Truck, title: 'Free Shipping', desc: 'On orders over $99' },
+        { icon: RotateCcw, title: 'Easy Returns', desc: '30-day return policy' },
+        { icon: ShieldCheck, title: 'Secure Payment', desc: '100% secure checkout' },
+        { icon: Headphones, title: '24/7 Support', desc: "We're here to help" },
+    ];
+    return (
+        <section className="py-8" style={{ backgroundColor: currentTheme.background }}>
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {features.map((f, i) => (
+                        <div key={i} className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: currentTheme.card, border: `1px solid ${currentTheme.border}` }}>
+                            <f.icon size={20} style={{ color: currentTheme.primaryBlue }} />
+                            <div>
+                                <p className="text-sm font-semibold" style={{ color: currentTheme.white }}>{f.title}</p>
+                                <p className="text-xs" style={{ color: currentTheme.muted }}>{f.desc}</p>
                             </div>
-                            <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase">Collection Image</p>
-                        </div>
-                    </div>
-                    <div>
-                        <span className="text-[10px] font-light tracking-[0.4em] text-gray-400 uppercase mb-6 block">Featured Collection</span>
-                        <h2 className="text-6xl font-thin text-white mb-8 leading-tight tracking-wider">New Season<br />Essentials</h2>
-                        <p className="text-gray-400 text-sm leading-loose mb-10 max-w-md font-light tracking-wide">
-                            Discover our curated selection of timeless pieces designed for the modern wardrobe. Quality craftsmanship meets contemporary design.
-                        </p>
-                        <Link href="/shop" className="inline-block bg-white text-gray-900 text-xs font-light px-10 py-4 rounded-sm hover:bg-gray-100 transition-colors tracking-[0.2em] uppercase">
-                            Explore Collection
-                        </Link>
-                    </div>
-                </div>
-            </section>
-
-            {/* Trust Badges */}
-            <section className="py-14 bg-white border-t border-gray-100">
-                <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                    {[
-                        { title: 'Free Shipping', desc: 'On orders above Rp200k' },
-                        { title: 'Easy Return', desc: '30 days return policy' },
-                        { title: 'Secure Payment', desc: '100% secure transactions' },
-                        { title: '24/7 Support', desc: 'Always here for you' },
-                    ].map(item => (
-                        <div key={item.title} className="flex flex-col items-center gap-3">
-                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                            </div>
-                            <p className="font-black text-gray-900 text-sm">{item.title}</p>
-                            <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
                         </div>
                     ))}
                 </div>
-            </section>
+            </div>
+        </section>
+    );
+}
 
-            {/* Footer */}
-            <footer className="bg-gray-950 text-gray-400 py-20">
-                <div className="px-6 lg:px-20 grid md:grid-cols-4 gap-16 mb-16">
-                    <div>
-                        <span className="text-2xl font-black text-white tracking-widest block mb-6">VESTO</span>
-                        <p className="text-sm leading-relaxed mb-8">Premium fashion for the bold and the beautiful.</p>
-                        <div className="flex gap-3">
-                            {['IG', 'TK', 'TW', 'FB'].map(s => (
-                                <a key={s} href="#" className="w-9 h-9 border border-gray-700 rounded-full flex items-center justify-center text-xs font-bold hover:border-white hover:text-white transition-all">{s}</a>
-                            ))}
+/* ── Flash Sale ─────────────────────────────────────────── */
+function FlashSale({ products = [], theme = 'light' }) {
+    const [ref, isVisible] = useScrollAnimation(0.1);
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        muted: '#667085',
+        primaryBlue: '#4F6BFF',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        border: 'rgba(0,0,0,0.1)',
+        white: '#1A1A1A',
+        muted: '#6C757D',
+        primaryBlue: '#4F6BFF',
+    };
+
+    const countdown = useCountdown({ days: 2, hours: 15, minutes: 34, seconds: 10 });
+    const flashItems = products.some(p => p.special_price) ? products.filter(p => p.special_price) : products;
+
+    if (!flashItems.length) return null;
+
+    return (
+        <section 
+            ref={ref}
+            className="py-14 transition-all duration-700"
+            style={{ 
+                backgroundColor: currentTheme.background,
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+            }}
+        >
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                <div className="flex flex-wrap items-center justify-between gap-5 mb-8">
+                    <div className="flex items-center gap-3">
+                        <div 
+                            className="w-9 h-9 rounded-lg flex items-center justify-center animate-pulse" 
+                            style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)' }}
+                        >
+                            <Zap size={18} className="text-white" fill="white" />
+                        </div>
+                        <h2 className="text-xl md:text-2xl font-bold" style={{ color: currentTheme.white }}>Flash Sale</h2>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                        <span className="text-xs font-medium mr-1" style={{ color: currentTheme.muted }}>Ends in</span>
+                        {Object.entries(countdown).map(([unit, value]) => (
+                            <div key={unit} className="text-center">
+                                <div 
+                                    className="w-9 h-9 md:w-11 md:h-11 rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110" 
+                                    style={{ backgroundColor: currentTheme.card, border: `1px solid ${currentTheme.border}` }}
+                                >
+                                    <span className="text-xs md:text-sm font-bold" style={{ color: currentTheme.white }}>{String(value).padStart(2, '0')}</span>
+                                </div>
+                                <span className="text-[8px] uppercase tracking-wide" style={{ color: currentTheme.muted }}>{unit}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <Link href="/shop?sale=true" className="flex items-center gap-1 text-sm font-semibold transition-all duration-300 hover:gap-2" style={{ color: currentTheme.primaryBlue }}>
+                        View all <ChevronRight size={16} />
+                    </Link>
+                </div>
+
+                <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-hide">
+                    {flashItems.slice(0, 6).map((product, index) => (
+                        <div key={product.id} className="flex-shrink-0 w-[42%] sm:w-40 md:w-52">
+                            <ProductCard product={product} badgeType="discount" theme={theme} delay={index * 100} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Promo Banners ──────────────────────────────────────── */
+function PromoBanners({ banners = [], theme = 'light' }) {
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        primaryBlue: '#4F6BFF',
+        purple: '#6C63FF',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        border: 'rgba(0,0,0,0.1)',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        primaryBlue: '#4F6BFF',
+        purple: '#6C63FF',
+    };
+
+    // If no CMS banners, show fallback static banners
+    if (!banners || banners.length === 0) {
+        const gradient1 = theme === 'dark' 
+            ? 'linear-gradient(135deg, rgba(79,107,255,0.3), rgba(9,12,20,0.98))'
+            : 'linear-gradient(135deg, rgba(79,107,255,0.15), rgba(9,12,20,0.9))';
+        const gradient2 = theme === 'dark'
+            ? 'linear-gradient(135deg, rgba(108,99,255,0.3), rgba(9,12,20,0.98))'
+            : 'linear-gradient(135deg, rgba(108,99,255,0.15), rgba(9,12,20,0.9))';
+
+        return (
+            <section className="py-6" style={{ backgroundColor: currentTheme.background }}>
+                <div className="max-w-[1600px] mx-auto px-4 md:px-6 grid md:grid-cols-2 gap-5">
+                    <div className="relative rounded-2xl overflow-hidden p-8 min-h-[220px] flex flex-col justify-end" style={{ background: gradient1, border: `1px solid ${currentTheme.border}` }}>
+                        <span className="text-xs font-semibold tracking-wide uppercase mb-2" style={{ color: currentTheme.secondaryText }}>Summer '24</span>
+                        <h3 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: currentTheme.white }}>New Season<br />New Vibes</h3>
+                        <Link href="/shop?collection=summer" className="inline-flex items-center gap-2 text-sm font-bold w-fit px-5 py-2.5 rounded-xl" style={{ backgroundColor: currentTheme.white, color: currentTheme.background }}>
+                            Shop Now <ArrowRight size={14} />
+                        </Link>
+                    </div>
+                    <div className="relative rounded-2xl overflow-hidden p-8 min-h-[220px] flex flex-col justify-end" style={{ background: gradient2, border: `1px solid ${currentTheme.border}` }}>
+                        <span className="text-xs font-semibold tracking-wide uppercase mb-2" style={{ color: currentTheme.secondaryText }}>Up to 50% Off</span>
+                        <h3 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: currentTheme.white }}>Limited Time<br />Offer</h3>
+                        <Link href="/shop?sale=true" className="inline-flex items-center gap-2 text-sm font-bold w-fit px-5 py-2.5 rounded-xl" style={{ background: `linear-gradient(135deg, ${currentTheme.primaryBlue}, ${currentTheme.purple})`, color: currentTheme.white }}>
+                            Shop Sale <ArrowRight size={14} />
+                        </Link>
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <section className="py-6" style={{ backgroundColor: currentTheme.background }}>
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6 grid md:grid-cols-2 gap-5">
+                {banners.slice(0, 2).map((banner, index) => (
+                    <div key={banner.id || index} className="relative rounded-2xl overflow-hidden min-h-[220px]" style={{ border: `1px solid ${currentTheme.border}` }}>
+                        {banner.image ? (
+                            <img 
+                                src={banner.image.startsWith('http') ? banner.image : `/storage/${banner.image}`} 
+                                alt={banner.title || 'Promo Banner'} 
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: currentTheme.card }}>
+                                <Package size={48} style={{ color: currentTheme.secondaryText }} />
+                            </div>
+                        )}
+                        
+                        {/* Banner Content Overlay */}
+                        <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)' }}>
+                            {banner.subtitle && (
+                                <span className="text-xs font-semibold tracking-wide uppercase mb-2" style={{ color: banner.text_color || currentTheme.secondaryText }}>
+                                    {banner.subtitle}
+                                </span>
+                            )}
+                            {banner.title && (
+                                <h3 className="text-xl md:text-3xl font-bold mb-4" style={{ color: banner.text_color || currentTheme.white }}>
+                                    {banner.title}
+                                </h3>
+                            )}
+                            {banner.button_text && (
+                                <Link 
+                                    href={banner.button_link || '#'} 
+                                    className="inline-flex items-center gap-2 text-sm font-bold w-fit px-5 py-2.5 rounded-xl"
+                                    style={{ 
+                                        backgroundColor: banner.cta_style === 'filled_blue' ? currentTheme.primaryBlue : 
+                                                       banner.cta_style === 'filled_dark' ? 'rgba(0,0,0,0.6)' :
+                                                       banner.cta_style === 'outline' ? 'transparent' :
+                                                       currentTheme.white,
+                                        border: banner.cta_style === 'outline' ? '2px solid white' : 'none',
+                                        color: banner.cta_style === 'filled_blue' || banner.cta_style === 'filled_dark' ? '#FFFFFF' : currentTheme.background
+                                    }}
+                                >
+                                    {banner.button_text} <ArrowRight size={14} />
+                                </Link>
+                            )}
                         </div>
                     </div>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+/* ── New Arrivals ───────────────────────────────────────── */
+function NewArrivals({ products = [], theme = 'light' }) {
+    const [ref, isVisible] = useScrollAnimation(0.1);
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        white: '#FFFFFF',
+        primaryBlue: '#4F6BFF',
+    } : {
+        background: '#FFFFFF',
+        white: '#1A1A1A',
+        primaryBlue: '#4F6BFF',
+    };
+
+    if (!products.length) return null;
+    return (
+        <section 
+            ref={ref}
+            className="py-14 transition-all duration-700"
+            style={{ 
+                backgroundColor: currentTheme.background,
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+            }}
+        >
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2" style={{ color: currentTheme.white }}>
+                        <Sparkles size={18} style={{ color: currentTheme.primaryBlue }} /> New Arrivals
+                    </h2>
+                    <Link href="/shop?new=true" className="flex items-center gap-1 text-sm font-semibold transition-all duration-300 hover:gap-2" style={{ color: currentTheme.primaryBlue }}>
+                        View all <ChevronRight size={16} />
+                    </Link>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-5">
+                    {products.slice(0, 5).map((product, index) => (
+                        <ProductCard key={product.id} product={product} badgeType="new" theme={theme} delay={index * 100} />
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Fashion Collection Section ───────────────────────────── */
+function FashionCollection({ theme = 'light' }) {
+    const [ref, isVisible] = useScrollAnimation(0.1);
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+    } : {
+        background: '#F8F9FA',
+        card: '#F8F9FA',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+    };
+
+    const collections = [
+        {
+            id: 1,
+            name: "MEN'S COLLECTION",
+            subtitle: "Explore Collection →",
+            slug: 'men',
+            image: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=800&q=80'
+        },
+        {
+            id: 2,
+            name: "WOMEN'S COLLECTION",
+            subtitle: "Explore Collection →",
+            slug: 'women',
+            image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80'
+        },
+        {
+            id: 3,
+            name: "SNEAKERS",
+            subtitle: "Explore Collection →",
+            slug: 'shoes',
+            image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80'
+        },
+        {
+            id: 4,
+            name: "ACCESSORIES",
+            subtitle: "Explore Collection →",
+            slug: 'accessories',
+            image: 'https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=800&q=80'
+        },
+        {
+            id: 5,
+            name: "CASUAL WEAR",
+            subtitle: "Explore Collection →",
+            slug: 'casual',
+            image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80'
+        },
+        {
+            id: 6,
+            name: "BEAUTY",
+            subtitle: "Explore Collection →",
+            slug: 'beauty',
+            image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&q=80'
+        }
+    ];
+
+    return (
+        <section 
+            ref={ref}
+            className="py-20 md:py-24 transition-all duration-700"
+            style={{ 
+                backgroundColor: currentTheme.background,
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+            }}
+        >
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                {/* Headline */}
+                <div className="text-center mb-16">
+                    <h2 
+                        className="text-4xl md:text-6xl font-bold mb-4 transition-all duration-700"
+                        style={{ 
+                            color: currentTheme.white,
+                            fontFamily: "'Playfair Display', Georgia, serif",
+                            letterSpacing: '-0.02em',
+                            opacity: isVisible ? 1 : 0,
+                            transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+                        }}
+                    >
+                        Style For Every Moment
+                    </h2>
+                    <p 
+                        className="text-base md:text-lg transition-all duration-700 delay-200"
+                        style={{ 
+                            color: currentTheme.secondaryText,
+                            opacity: isVisible ? 1 : 0,
+                            transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+                        }}
+                    >
+                        Temukan pilihan fashion yang sesuai dengan gaya kamu.
+                    </p>
+                </div>
+
+                {/* Image Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {collections.map((collection, index) => (
+                        <Link
+                            key={collection.id}
+                            href={`/shop?category=${collection.slug}`}
+                            className="group relative rounded-2xl overflow-hidden cursor-pointer"
+                            style={{ 
+                                aspectRatio: '3/4',
+                                animation: isVisible ? `fadeInUp 0.6s ease-out ${index * 100}ms both` : 'none',
+                                opacity: 0
+                            }}
+                        >
+                            {/* Image */}
+                            <img
+                                src={collection.image}
+                                alt={collection.name}
+                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            />
+
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90" />
+
+                            {/* Content */}
+                            <div className="absolute bottom-0 left-0 right-0 p-6">
+                                <h3 className="text-xl md:text-2xl font-bold mb-2 transition-transform duration-300 group-hover:translate-x-2" style={{ 
+                                    color: THEME.white,
+                                    fontFamily: "'Playfair Display', Georgia, serif"
+                                }}>
+                                    {collection.name}
+                                </h3>
+                                <p className="text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ color: THEME.secondaryText }}>
+                                    {collection.subtitle}
+                                </p>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Featured Collection Section ─────────────────────────── */
+function FeaturedCollection({ theme = 'light' }) {
+    const [ref, isVisible] = useScrollAnimation(0.1);
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+        border: 'rgba(255,255,255,0.08)',
+    } : {
+        background: '#F8F9FA',
+        card: '#F8F9FA',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+        border: 'rgba(0,0,0,0.1)',
+    };
+
+    return (
+        <section 
+            ref={ref}
+            className="py-20 md:py-24 transition-all duration-700"
+            style={{ 
+                backgroundColor: currentTheme.background,
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(20px)'
+            }}
+        >
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    {/* Left: Large Image */}
+                    <div 
+                        className="relative transition-all duration-700"
+                        style={{
+                            animation: isVisible ? 'fadeInLeft 0.8s ease-out both' : 'none',
+                            opacity: 0
+                        }}
+                    >
+                        <img
+                            src="https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800&q=80"
+                            alt="Featured Collection"
+                            className="w-full rounded-2xl object-cover transition-transform duration-700 hover:scale-105"
+                            style={{ aspectRatio: '4/3' }}
+                        />
+                    </div>
+
+                    {/* Right: Editorial Content */}
+                    <div 
+                        className="flex flex-col justify-center transition-all duration-700 delay-200"
+                        style={{
+                            animation: isVisible ? 'fadeInRight 0.8s ease-out both' : 'none',
+                            opacity: 0
+                        }}
+                    >
+                        {/* Eyebrow */}
+                        <span className="text-xs font-bold tracking-[0.2em] uppercase mb-4" style={{ color: THEME.primaryBlue }}>
+                            NEW COLLECTION
+                        </span>
+
+                        {/* Headline */}
+                        <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight" style={{ 
+                            color: currentTheme.white,
+                            fontFamily: "'Playfair Display', Georgia, serif",
+                            letterSpacing: '-0.02em'
+                        }}>
+                            Discover Your<br />New Signature Style
+                        </h2>
+
+                        {/* Description */}
+                        <p className="text-base leading-relaxed mb-4" style={{ color: currentTheme.secondaryText }}>
+                            Explore our latest collection, thoughtfully designed for those who believe personal style is more than just what you wear. From effortless everyday essentials to statement pieces, discover modern silhouettes, refined details, and versatile designs created to elevate your wardrobe.
+                        </p>
+
+                        {/* Supporting Paragraph */}
+                        <p className="text-base leading-relaxed mb-8" style={{ color: currentTheme.secondaryText }}>
+                            Find pieces that move with you, express your personality, and make every look feel uniquely yours.
+                        </p>
+
+                        {/* Collection Highlights */}
+                        <div className="mb-8 space-y-4">
+                            <div className="flex items-start gap-3 transition-all duration-300 hover:translate-x-2">
+                                <div className="w-1 h-1 rounded-full mt-2" style={{ backgroundColor: THEME.primaryBlue }}></div>
+                                <div>
+                                    <p className="text-sm font-semibold mb-1" style={{ color: currentTheme.white }}>NEW ARRIVALS</p>
+                                    <p className="text-xs" style={{ color: currentTheme.muted }}>Latest pieces for the season</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 transition-all duration-300 hover:translate-x-2">
+                                <div className="w-1 h-1 rounded-full mt-2" style={{ backgroundColor: THEME.primaryBlue }}></div>
+                                <div>
+                                    <p className="text-sm font-semibold mb-1" style={{ color: currentTheme.white }}>MODERN ESSENTIALS</p>
+                                    <p className="text-xs" style={{ color: currentTheme.muted }}>Timeless pieces for everyday wear</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3 transition-all duration-300 hover:translate-x-2">
+                                <div className="w-1 h-1 rounded-full mt-2" style={{ backgroundColor: THEME.primaryBlue }}></div>
+                                <div>
+                                    <p className="text-sm font-semibold mb-1" style={{ color: currentTheme.white }}>STATEMENT PIECES</p>
+                                    <p className="text-xs" style={{ color: currentTheme.muted }}>Bold styles made to stand out</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CTA Button */}
+                        <Link
+                            href="/collections"
+                            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-lg mb-4"
+                            style={{ 
+                                backgroundColor: theme === 'dark' ? currentTheme.card : '#1A1A1A',
+                                color: theme === 'dark' ? currentTheme.white : '#FFFFFF',
+                                border: `1px solid ${currentTheme.border}`
+                            }}
+                        >
+                            View Collection <ArrowRight size={16} />
+                        </Link>
+
+                        {/* Secondary Text */}
+                        <p className="text-xs" style={{ color: currentTheme.muted }}>
+                            Explore the latest styles →
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+function Footer({ theme }) {
+    const currentTheme = theme === 'dark' ? {
+        background: '#111827',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+        border: 'rgba(255,255,255,0.08)',
+    } : {
+        background: '#F8F9FA',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+        border: 'rgba(0,0,0,0.1)',
+    };
+
+    return (
+        <footer className="py-14" style={{ backgroundColor: currentTheme.background, borderTop: `1px solid ${currentTheme.border}` }}>
+            <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+                <div className="grid md:grid-cols-4 gap-10 mb-10">
                     <div>
-                        <p className="text-white font-bold mb-6 text-sm tracking-widest uppercase">Shop</p>
-                        <ul className="space-y-4 text-sm">
-                            <li><Link href="/shop" className="hover:text-white transition-colors">All Products</Link></li>
-                            {categories.slice(0, 4).map(cat => (
-                                <li key={cat.slug}>
-                                    <Link href={`/shop?category=${cat.slug}`} className="hover:text-white transition-colors">{cat.name}</Link>
-                                </li>
-                            ))}
+                        <span className="text-2xl font-bold tracking-tight" style={{ color: currentTheme.white }}>VESTO</span>
+                        <p className="text-sm mt-4 leading-relaxed" style={{ color: currentTheme.secondaryText }}>
+                            Premium fashion for the modern individual.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-bold mb-4 tracking-wider uppercase" style={{ color: currentTheme.white }}>Shop</h4>
+                        <ul className="space-y-3">
+                            <li><Link href="/shop" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>All Products</Link></li>
+                            <li><Link href="/collections" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>Collections</Link></li>
+                            <li><Link href="/shop?sale=true" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>Sale</Link></li>
                         </ul>
                     </div>
                     <div>
-                        <p className="text-white font-bold mb-6 text-sm tracking-widest uppercase">Policies</p>
-                        <ul className="space-y-4 text-sm">
-                            {[
-                                { name: 'Privacy Policy', href: '/privacy-policy' },
-                                { name: 'Terms of Use', href: '/terms' },
-                                { name: 'Shipping Policy', href: '/shipping' },
-                                { name: 'Return Policy', href: '/returns' },
-                            ].map(i => (
-                                <li key={i.name}><a href={i.href} className="hover:text-white transition-colors">{i.name}</a></li>
-                            ))}
+                        <h4 className="text-xs font-bold mb-4 tracking-wider uppercase" style={{ color: currentTheme.white }}>Support</h4>
+                        <ul className="space-y-3">
+                            <li><Link href="/contact" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>Contact Us</Link></li>
+                            <li><Link href="/faq" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>FAQ</Link></li>
+                            <li><Link href="/returns" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>Returns</Link></li>
                         </ul>
                     </div>
                     <div>
-                        <p className="text-white font-bold mb-6 text-sm tracking-widest uppercase">Newsletter</p>
-                        <p className="text-sm mb-6 leading-relaxed">Subscribe to stay in touch.</p>
-                        <div className="flex gap-2">
-                            <input type="email" placeholder="your@email.com"
-                                className="flex-1 bg-gray-800 text-white text-sm px-4 py-3 rounded-full border border-gray-700 focus:outline-none focus:border-gray-500" />
-                            <button className="bg-white text-gray-900 text-sm font-bold px-5 py-3 rounded-full hover:bg-gray-100 transition-colors">→</button>
-                        </div>
+                        <h4 className="text-xs font-bold mb-4 tracking-wider uppercase" style={{ color: currentTheme.white }}>Company</h4>
+                        <ul className="space-y-3">
+                            <li><Link href="/about" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>About Us</Link></li>
+                            <li><Link href="/privacy" className="text-sm hover:text-blue-400" style={{ color: currentTheme.secondaryText }}>Privacy</Link></li>
+                        </ul>
                     </div>
                 </div>
-                <div className="px-6 lg:px-20 pt-8 border-t border-gray-800 text-center text-xs">
-                    © 2026 Vesto. All rights reserved.
+                <div className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4" style={{ borderTop: `1px solid ${currentTheme.border}` }}>
+                    <p className="text-xs" style={{ color: currentTheme.muted }}>© 2026 VESTO. All rights reserved.</p>
                 </div>
-            </footer>
-        </div>
+            </div>
+        </footer>
+    );
+}
+
+/* ── Main Home Component ─────────────────────────────────── */
+export default function Home({ latestProducts = [], bestSellers = [], featuredProducts = [], homeSections = [], categories = [], heroBanners = [], promoBanners = [] }) {
+    const { theme, toggleTheme } = useTheme();
+    const heroProduct = featuredProducts[0] ?? latestProducts[0] ?? null;
+    const arrivals = latestProducts.length ? latestProducts : bestSellers;
+    const flashPool = bestSellers.length ? bestSellers : latestProducts;
+
+    // Dynamic theme based on current theme
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        secondaryCard: '#161F2F',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+        danger: '#EF4444',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        secondaryCard: '#E9ECEF',
+        border: 'rgba(0,0,0,0.1)',
+        white: '#FFFFFF',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+        danger: '#EF4444',
+    };
+
+    const CURRENT_THEME = currentTheme;
+
+    return (
+        <>
+            <style>{animationStyles}</style>
+            <div style={{ backgroundColor: CURRENT_THEME.background, fontFamily: "'Inter', sans-serif" }}>
+                {/* Top Bar */}
+                <div className={`${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'} text-center py-2.5 text-xs tracking-widest font-medium animate-pulse`}>
+                    FREE SHIPPING ON ORDERS ABOVE RP200.000 &nbsp;·&nbsp; NEW COLLECTION 2026
+                </div>
+
+                {/* Navbar */}
+                <Navbar categories={categories} darkMode={theme === 'dark'} />
+                <HeroBannerSlider banners={heroBanners} theme={theme} />
+                <CategoryStrip categories={categories} theme={theme} />
+                <FeatureStrip theme={theme} />
+                <FlashSale products={flashPool} theme={theme} />
+                <PromoBanners banners={promoBanners} theme={theme} />
+                <NewArrivals products={arrivals} theme={theme} />
+                <FashionCollection theme={theme} />
+                <FeaturedCollection theme={theme} />
+                <Footer theme={theme} />
+            </div>
+        </>
     );
 }

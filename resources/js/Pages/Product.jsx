@@ -3,6 +3,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Heart, Minus, Plus, Share2, ShoppingCart, X, ZoomIn, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Star, Truck, ShieldCheck, RotateCcw, CreditCard, Package } from 'lucide-react';
 import Navbar from '../Components/Shared/Navbar';
 import VariantSelector from '../Components/Shop/VariantSelector';
+import StackGallery from '../Components/Shop/StackGallery';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
+import { useTheme } from '../Context/ThemeContext';
 
 function fmt(value) {
     return new Intl.NumberFormat('id-ID', {
@@ -24,12 +27,20 @@ function StarRating({ rating, size = 'sm' }) {
     );
 }
 
-function ImgWithFallback({ src, alt, className = '' }) {
+function ImgWithFallback({ src, alt, className = '', theme = 'light' }) {
     const [err, setErr] = useState(false);
+    const currentTheme = theme === 'dark' ? {
+        bg: '#1F2937',
+        icon: '#667085',
+    } : {
+        bg: '#F3F4F6',
+        icon: '#9CA3AF',
+    };
+
     if (!src || err) {
         return (
-            <div className={`flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50 ${className}`}>
-                <svg className="w-16 h-16 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className={`flex items-center justify-center ${className}`} style={{ backgroundColor: currentTheme.bg }}>
+                <svg className="w-16 h-16" style={{ color: currentTheme.icon }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
                         d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
@@ -39,8 +50,27 @@ function ImgWithFallback({ src, alt, className = '' }) {
     return <img src={src} alt={alt} className={`object-cover ${className}`} onError={() => setErr(true)} />;
 }
 
-export default function Product({ product, variants = [], related = [], categories = [], configurableAttributes = [], reviews = [], canReview = false }) {
+export default function Product({ product, variants = [], related = [], categories = [], configurableAttributes = [], reviews = [], canReview = false, questions = [] }) {
     const { auth, flash } = usePage().props;
+    const { theme } = useTheme();
+    const { addToRecentlyViewed } = useRecentlyViewed();
+    
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        border: 'rgba(0,0,0,0.1)',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+    };
+
     const [activeImg, setActiveImg] = useState(0);
     const [qty, setQty] = useState(1);
     const [selectedVariant, setSelectedVariant] = useState(null);
@@ -63,10 +93,89 @@ export default function Product({ product, variants = [], related = [], categori
     const [replyInputOpen, setReplyInputOpen] = useState(null);
     const [replyText, setReplyText] = useState('');
     const [helpfulLikes, setHelpfulLikes] = useState({});
+    const [questionText, setQuestionText] = useState('');
+    const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
+    const [localQuestions, setLocalQuestions] = useState(questions);
+    const [backgroundColor, setBackgroundColor] = useState(product.custom_background_color || '#ffffff');
     const photoInputRef = useRef(null);
     const thumbStripRef = useRef(null);
 
+    // Add to recently viewed when product is viewed
+    useEffect(() => {
+        if (product) {
+            addToRecentlyViewed({
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                image: product.image || product.images?.[0],
+                slug: product.slug,
+            });
+        }
+    }, [product, addToRecentlyViewed]);
+
     const isConfigurable = product.type === 'configurable' && variants.length > 0;
+
+    // Color mapping for variant background
+    const colorMap = {
+        'red': '#EF4444',
+        'blue': '#3B82F6',
+        'green': '#10B981',
+        'yellow': '#F59E0B',
+        'orange': '#F97316',
+        'purple': '#8B5CF6',
+        'pink': '#EC4899',
+        'black': '#000000',
+        'white': '#FFFFFF',
+        'gray': '#6B7280',
+        'brown': '#92400E',
+        'beige': '#F5F5DC',
+        'cream': '#FFFDD0',
+        'navy': '#000080',
+        'teal': '#008080',
+        'maroon': '#800000',
+        'gold': '#FFD700',
+        'silver': '#C0C0C0',
+    };
+
+    // Create variant-based image mapping
+    const variantImages = isConfigurable ? (() => {
+        const mapping = {};
+        // Group images by color
+        variants.forEach(variant => {
+            if (variant.color) {
+                const colorKey = variant.color.toLowerCase().trim();
+                if (!mapping[colorKey]) {
+                    mapping[colorKey] = [];
+                }
+                // Add unique images for this color
+                if (variant.images?.length > 0) {
+                    variant.images.forEach(img => {
+                        if (!mapping[colorKey].includes(img)) {
+                            mapping[colorKey].push(img);
+                        }
+                    });
+                }
+            }
+        });
+        
+        // If no variant images found, use product images as default for all colors
+        if (Object.keys(mapping).length === 0 && product.images?.length > 0) {
+            mapping['default'] = product.images;
+        } else if (Object.keys(mapping).length > 0) {
+            // Ensure we have a default fallback
+            if (!mapping['default'] && product.images?.length > 0) {
+                mapping['default'] = product.images;
+            }
+        }
+        
+        return mapping;
+    })() : { 'default': product.images?.length > 0 ? product.images : (product.image ? [product.image] : ['/placeholder.jpg']) };
+
+    // Get current images based on selected color or default
+    const currentColor = selectedAttributes.color?.toLowerCase().trim() || 'default';
+    const currentVariantImages = (variantImages[currentColor] && variantImages[currentColor].length > 0) 
+        ? variantImages[currentColor] 
+        : (variantImages['default'] || []);
 
     const attributeOptions = isConfigurable && configurableAttributes.length > 0
         ? (() => {
@@ -120,7 +229,7 @@ export default function Product({ product, variants = [], related = [], categori
                 detectedAttributes.every(a => v[a]?.toLowerCase().trim() === selectedAttributes[a]?.toLowerCase().trim())
             );
             setSelectedVariant(match || null);
-            setActiveImg(0);
+            // Don't reset activeImg here - let the color change handle it
         } else {
             setSelectedVariant(null);
         }
@@ -137,23 +246,22 @@ export default function Product({ product, variants = [], related = [], categori
         if (Object.keys(initial).length > 0) setSelectedAttributes(initial);
     }, [isConfigurable]);
 
-    let displayImages = [];
-    let thumbnailsToShow = [];
-
-    if (isConfigurable && variants.length > 0) {
-        if (selectedVariant) {
-            displayImages = selectedVariant.images?.length > 0 ? selectedVariant.images
-                : (product.images?.length > 0 ? product.images : (product.image ? [product.image] : ['/placeholder.jpg']));
+    // Variant background effect
+    useEffect(() => {
+        if (product.enable_variant_background && selectedAttributes.color) {
+            const colorKey = selectedAttributes.color.toLowerCase().trim();
+            const mappedColor = colorMap[colorKey];
+            if (mappedColor) {
+                setBackgroundColor(mappedColor);
+            }
         } else {
-            // Show gallery images only when no variant selected
-            displayImages = product.images?.length > 0 ? product.images
-                : (product.image ? [product.image] : ['/placeholder.jpg']);
+            setBackgroundColor(product.custom_background_color || '#ffffff');
         }
-    } else {
-        displayImages = product.images?.length > 0 ? product.images
-            : (product.image ? [product.image] : ['/placeholder.jpg']);
-    }
-    thumbnailsToShow = displayImages;
+    }, [selectedAttributes.color, product.enable_variant_background, product.custom_background_color]);
+
+    let displayImages = currentVariantImages.length > 0 ? currentVariantImages 
+        : (product.images?.length > 0 ? product.images : (product.image ? [product.image] : ['/placeholder.jpg']));
+    let thumbnailsToShow = displayImages;
 
     let displayPrice, hasDiscount, originalPrice, discountPct, currentStock;
     if (isConfigurable && !selectedVariant) {
@@ -237,10 +345,12 @@ export default function Product({ product, variants = [], related = [], categori
                     });
                 }
             }
+            
+            // Reset gallery when color changes
+            setActiveImg(0);
         }
         
         setSelectedAttributes(newSelections);
-        setActiveImg(0);
     };
 
     const handleReviewSubmit = (e) => {
@@ -350,6 +460,38 @@ export default function Product({ product, variants = [], related = [], categori
         });
     };
 
+    const handleQuestionSubmit = (e) => {
+        e.preventDefault();
+        if (!questionText.trim()) { alert('Please write a question'); return; }
+        setIsSubmittingQuestion(true);
+        router.post(`/products/${product.id}/questions`, { question: questionText }, {
+            onSuccess: () => {
+                setQuestionText('');
+                setIsSubmittingQuestion(false);
+                // Add new question to local state
+                const newQuestion = {
+                    id: Date.now(), // temporary ID
+                    question: questionText,
+                    answer: null,
+                    created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    answered_at: null,
+                    user: {
+                        id: auth.user.id,
+                        name: auth.user.name,
+                    },
+                    answered_by: null,
+                };
+                setLocalQuestions([newQuestion, ...localQuestions]);
+                alert('Question submitted successfully!');
+            },
+            onError: (errors) => {
+                const e = Object.values(errors)[0];
+                alert(Array.isArray(e) ? e[0] : e || 'Failed to submit question');
+                setIsSubmittingQuestion(false);
+            },
+        });
+    };
+
     useEffect(() => {
         const initialLikes = {};
         reviews.forEach(review => { initialLikes[review.id] = review.is_liked || false; });
@@ -368,9 +510,9 @@ export default function Product({ product, variants = [], related = [], categori
     }, [menuOpen, replyMenuOpen]);
 
     return (
-        <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="min-h-screen transition-colors duration-500" style={{ backgroundColor: currentTheme.background, fontFamily: "'Inter', sans-serif" }}>
             {/* Announcement Bar */}
-            <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white text-center py-2.5 text-[11px] tracking-[0.2em] font-medium">
+            <div className={`${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-800'} text-white text-center py-2.5 text-[11px] tracking-[0.2em] font-medium`}>
                 <span className="inline-flex items-center gap-2">
                     <Truck className="w-3.5 h-3.5" />
                     FREE SHIPPING ON ORDERS ABOVE Rp200.000
@@ -378,22 +520,22 @@ export default function Product({ product, variants = [], related = [], categori
             </div>
 
             {/* Navbar */}
-            <Navbar categories={categories} />
+            <Navbar categories={categories} darkMode={theme === 'dark'} />
 
             {/* Breadcrumb */}
             <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4">
-                <nav className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <Link href="/" className="hover:text-gray-600 transition-colors">Home</Link>
-                    <span className="text-gray-300">/</span>
+                <nav className="flex items-center gap-1.5 text-xs" style={{ color: currentTheme.muted }}>
+                    <Link href="/" className="hover:opacity-80 transition-opacity" style={{ color: currentTheme.secondaryText }}>Home</Link>
+                    <span style={{ color: currentTheme.border === 'rgba(255,255,255,0.08)' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>/</span>
                     {product.categories?.[0] && (
                         <>
-                            <Link href={`/shop?category=${product.categories[0].slug}`} className="hover:text-gray-600 transition-colors capitalize">
+                            <Link href={`/shop?category=${product.categories[0].slug}`} className="hover:opacity-80 transition-opacity capitalize" style={{ color: currentTheme.secondaryText }}>
                                 {product.categories[0].name}
                             </Link>
-                            <span className="text-gray-300">/</span>
+                            <span style={{ color: currentTheme.border === 'rgba(255,255,255,0.08)' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>/</span>
                         </>
                     )}
-                    <span className="text-gray-600 font-medium truncate max-w-xs">{product.name}</span>
+                    <span className="font-medium truncate max-w-xs" style={{ color: currentTheme.white }}>{product.name}</span>
                 </nav>
             </div>
 
@@ -407,10 +549,14 @@ export default function Product({ product, variants = [], related = [], categori
                             <button key={idx} onClick={() => setActiveImg(idx)}
                                 className={`w-full aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                                     activeImg === idx
-                                        ? 'border-gray-900 shadow-md scale-105'
-                                        : 'border-gray-100 hover:border-gray-400 opacity-70 hover:opacity-100'
-                                }`}>
-                                <ImgWithFallback src={img} alt={`View ${idx + 1}`} className="w-full h-full" />
+                                        ? 'shadow-md scale-105'
+                                        : 'opacity-70 hover:opacity-100'
+                                }`}
+                                style={{ 
+                                    borderColor: activeImg === idx ? '#111827' : currentTheme.border 
+                                }}
+                            >
+                                <ImgWithFallback src={img} alt={`View ${idx + 1}`} className="w-full h-full" theme={theme} />
                             </button>
                         ))}
                         {thumbnailsToShow.length > 5 && (
@@ -428,51 +574,22 @@ export default function Product({ product, variants = [], related = [], categori
                         )}
                     </div>
 
-                    {/* ── Main Image ── */}
+                    {/* ── Main Image (StackGallery) ── */}
                     <div className="relative group">
-                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl overflow-hidden aspect-[3/4] border border-gray-100 relative">
-                            <ImgWithFallback
-                                src={displayImages[activeImg] || displayImages[0]}
-                                alt={product.name}
-                                className="w-full h-full transition-transform duration-500 group-hover:scale-[1.02]"
-                            />
-                            {/* Discount badge */}
-                            {hasDiscount && discountPct > 0 && (
-                                <div className="absolute top-4 right-4 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-red-200">
-                                    -{discountPct}% OFF
-                                </div>
-                            )}
-                            {/* New badge */}
-                            {product.new && !hasDiscount && (
-                                <div className="absolute top-4 right-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg shadow-emerald-200 uppercase tracking-wider">
-                                    New
-                                </div>
-                            )}
-                            {/* Zoom button */}
-                            <button onClick={() => setLightboxOpen(true)}
-                                className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 hover:bg-white">
-                                <ZoomIn className="w-4.5 h-4.5 text-gray-700" />
-                            </button>
-                            {/* Image counter */}
-                            {displayImages.length > 1 && (
-                                <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full">
-                                    {activeImg + 1} / {displayImages.length}
-                                </div>
-                            )}
-                        </div>
-                        {/* Mobile thumbnails row */}
-                        {thumbnailsToShow.length > 1 && (
-                            <div className="flex lg:hidden gap-2 mt-3 overflow-x-auto pb-1 scrollbar-hide">
-                                {thumbnailsToShow.map((img, idx) => (
-                                    <button key={idx} onClick={() => setActiveImg(idx)}
-                                        className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                                            activeImg === idx
-                                                ? 'border-gray-900 shadow-md'
-                                                : 'border-gray-100 opacity-60 hover:opacity-100'
-                                        }`}>
-                                        <ImgWithFallback src={img} alt={`View ${idx + 1}`} className="w-full h-full" />
-                                    </button>
-                                ))}
+                        <StackGallery 
+                            images={displayImages}
+                            className="w-full"
+                        />
+                        {/* Discount badge */}
+                        {hasDiscount && discountPct > 0 && (
+                            <div className="absolute top-4 right-4 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-red-200 z-40">
+                                -{discountPct}% OFF
+                            </div>
+                        )}
+                        {/* New badge */}
+                        {product.new && !hasDiscount && (
+                            <div className="absolute top-4 right-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg shadow-emerald-200 uppercase tracking-wider z-40">
+                                New
                             </div>
                         )}
                     </div>
@@ -482,49 +599,53 @@ export default function Product({ product, variants = [], related = [], categori
                         {/* Category badge */}
                         {product.categories?.[0] && (
                             <Link href={`/shop?category=${product.categories[0].slug}`}
-                                className="inline-flex w-fit items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full transition-colors">
+                                className="inline-flex w-fit items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full transition-colors"
+                                style={{ backgroundColor: currentTheme.card, color: currentTheme.secondaryText }}
+                            >
                                 {product.categories[0].name}
                             </Link>
                         )}
 
                         {/* Name */}
-                        <h1 className="text-3xl font-extrabold text-gray-900 leading-tight tracking-tight">{product.name}</h1>
+                        <h1 className="text-3xl font-extrabold leading-tight tracking-tight" style={{ color: currentTheme.white }}>{product.name}</h1>
 
                         {/* Rating + Sold */}
                         <div className="flex items-center gap-3 flex-wrap">
                             <div className="flex items-center gap-1.5">
                                 <StarRating rating={Number(avgRating)} size="md" />
-                                <span className="text-sm font-bold text-gray-700">{avgRating}</span>
+                                <span className="text-sm font-bold" style={{ color: currentTheme.secondaryText }}>{avgRating}</span>
                             </div>
                             <button onClick={() => setActiveTab('reviews')}
-                                className="text-sm text-gray-400 hover:text-gray-600 transition-colors underline underline-offset-2">
+                                className="text-sm hover:opacity-80 transition-opacity underline underline-offset-2"
+                                style={{ color: currentTheme.muted }}
+                            >
                                 {totalReviews.toLocaleString()} reviews
                             </button>
-                            <span className="text-gray-200">|</span>
-                            <span className="text-sm text-gray-500 font-medium">{(product.sold_count ?? 0).toLocaleString()} sold</span>
+                            <span style={{ color: currentTheme.border === 'rgba(255,255,255,0.08)' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}>|</span>
+                            <span className="text-sm font-medium" style={{ color: currentTheme.muted }}>{(product.sold_count ?? 0).toLocaleString()} sold</span>
                         </div>
 
                         {/* Price row */}
-                        <div className="bg-gradient-to-r from-gray-50 to-white border border-gray-100 rounded-2xl p-4">
+                        <div className="rounded-2xl p-4" style={{ background: theme === 'dark' ? 'linear-gradient(to-r, #1F2937, #111827)' : 'linear-gradient(to-r, #F9FAFB, #FFFFFF)', border: `1px solid ${currentTheme.border}` }}>
                             <div className="flex items-end gap-3 flex-wrap">
-                                <span className="text-4xl font-extrabold text-gray-900 leading-none">{fmt(displayPrice)}</span>
+                                <span className="text-4xl font-extrabold leading-none" style={{ color: currentTheme.white }}>{fmt(displayPrice)}</span>
                                 {hasDiscount && originalPrice && (
                                     <div className="flex items-center gap-2 pb-0.5">
-                                        <span className="text-base text-gray-400 line-through font-medium">{fmt(originalPrice)}</span>
-                                        <span className="bg-red-100 text-red-600 text-xs font-bold px-2.5 py-1 rounded-full">
+                                        <span className="text-base line-through font-medium" style={{ color: currentTheme.muted }}>{fmt(originalPrice)}</span>
+                                        <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)', color: '#DC2626' }}>
                                             Save {discountPct}%
                                         </span>
                                     </div>
                                 )}
                             </div>
                             {hasDiscount && (
-                                <p className="text-xs text-red-400 mt-1.5 font-medium">Limited time offer — don't miss out!</p>
+                                <p className="text-xs mt-1.5 font-medium" style={{ color: '#DC2626' }}>Limited time offer — don't miss out!</p>
                             )}
                         </div>
 
 
                         {/* Divider */}
-                        <div className="border-t border-gray-100" />
+                        <div style={{ borderTop: `1px solid ${currentTheme.border}` }} />
 
                         {/* Variant Selector */}
                         {isConfigurable && (
@@ -1078,22 +1199,118 @@ export default function Product({ product, variants = [], related = [], categori
                     </div>
                 )}
 
+                {/* Related Products */}
+                {related.length > 0 && (
+                    <div className="mt-16 pt-12 border-t border-gray-200">
+                        <h3 className="text-2xl font-bold text-gray-900 mb-8">You May Also Like</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            {related.map((relatedProduct) => (
+                                <Link
+                                    key={relatedProduct.id}
+                                    href={`/product/${relatedProduct.id}`}
+                                    className="group"
+                                >
+                                    <div className="relative overflow-hidden rounded-2xl bg-gray-100 aspect-[3/4] mb-4">
+                                        <ImgWithFallback
+                                            src={relatedProduct.image || relatedProduct.images?.[0]}
+                                            alt={relatedProduct.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                    </div>
+                                    <h4 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-gray-600 transition-colors">
+                                        {relatedProduct.name}
+                                    </h4>
+                                    <p className="text-sm font-bold text-gray-900">{fmt(relatedProduct.price)}</p>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Q&A Tab */}
                 {activeTab === 'qna' && (
                     <div className="max-w-2xl">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-lg font-bold text-gray-900">Questions & Answers</h3>
-                            <button className="text-sm font-bold bg-gradient-to-r from-gray-900 to-gray-800 text-white px-6 py-2.5 rounded-2xl hover:from-gray-800 hover:to-gray-700 transition-all duration-300 shadow-md shadow-gray-900/20">
-                                Ask a Question
-                            </button>
                         </div>
-                        <div className="text-center py-16 bg-gray-50 rounded-3xl">
-                            <svg className="w-16 h-16 mx-auto text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <p className="text-sm text-gray-400 mb-1">No questions yet.</p>
-                            <p className="text-xs text-gray-300">Be the first to ask a question!</p>
+                        
+                        {/* Ask Question Form */}
+                        <div className="bg-gray-50 rounded-3xl p-6 mb-8">
+                            <h4 className="font-bold text-gray-900 mb-4">Ask a Question</h4>
+                            {auth?.user ? (
+                                <form onSubmit={handleQuestionSubmit}>
+                                    <textarea
+                                        value={questionText}
+                                        onChange={(e) => setQuestionText(e.target.value)}
+                                        placeholder="What would you like to know about this product?"
+                                        className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-400 transition-all resize-none"
+                                        rows={3}
+                                        maxLength={1000}
+                                    />
+                                    <div className="flex items-center justify-between mt-3">
+                                        <p className="text-xs text-gray-400">{questionText.length}/1000 characters</p>
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmittingQuestion || !questionText.trim()}
+                                            className="bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-gray-800 disabled:opacity-40 transition-all duration-200 shadow-sm"
+                                        >
+                                            {isSubmittingQuestion ? 'Submitting...' : 'Submit Question'}
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <p className="text-sm text-gray-500 mb-3">Please login to ask a question</p>
+                                    <Link href="/login" className="inline-block bg-gray-900 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-gray-800 transition-all duration-200">
+                                        Login
+                                    </Link>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Questions List */}
+                        {localQuestions.length === 0 ? (
+                            <div className="text-center py-16 bg-gray-50 rounded-3xl">
+                                <svg className="w-16 h-16 mx-auto text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <p className="text-sm text-gray-400 mb-1">No questions yet.</p>
+                                <p className="text-xs text-gray-300">Be the first to ask a question!</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {localQuestions.map((q) => (
+                                    <div key={q.id} className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-shadow duration-300">
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                                                {q.user?.name?.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <p className="text-sm font-bold text-gray-900">{q.user?.name}</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">{q.created_at}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-gray-700 mb-3">{q.question}</p>
+                                        {q.answer && (
+                                            <div className="bg-emerald-50 rounded-xl p-4 mt-3">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded-full uppercase tracking-wider">Admin Answer</span>
+                                                </div>
+                                                <p className="text-sm text-gray-700">{q.answer}</p>
+                                                <p className="text-xs text-gray-400 mt-2">Answered by {q.answered_by?.name} • {q.answered_at}</p>
+                                            </div>
+                                        )}
+                                        {!q.answer && (
+                                            <div className="mt-3">
+                                                <span className="text-xs text-amber-600 font-medium">Waiting for admin response...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

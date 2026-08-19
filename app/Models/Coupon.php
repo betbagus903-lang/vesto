@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Coupon extends Model
 {
@@ -33,22 +34,27 @@ class Coupon extends Model
         'is_active' => 'boolean',
     ];
 
+    public function userCoupons(): HasMany
+    {
+        return $this->hasMany(UserCoupon::class);
+    }
+
     public function getStatusAttribute()
     {
         if (!$this->is_active) {
             return 'disabled';
         }
-        
+
         $now = now();
-        
+
         if ($this->expire_date && $now->gt($this->expire_date)) {
             return 'expired';
         }
-        
+
         if ($this->start_date && $now->lt($this->start_date)) {
             return 'scheduled';
         }
-        
+
         return 'active';
     }
 }

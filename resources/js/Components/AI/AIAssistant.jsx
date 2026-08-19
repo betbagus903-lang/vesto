@@ -82,7 +82,18 @@ export default function AIAssistant() {
   // Load sessions from database
   const loadSessions = async () => {
     try {
-      const response = await fetch('/admin/ai/sessions');
+      const response = await fetch('/admin/ai/sessions', {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to load sessions:', response.status);
+        setSessions([]);
+        return;
+      }
+      
       const data = await response.json();
       console.log('Loaded sessions:', data);
       // Only show sessions that have chat history
@@ -91,6 +102,7 @@ export default function AIAssistant() {
       setSessions(filteredSessions);
     } catch (error) {
       console.error('Failed to load sessions:', error);
+      setSessions([]);
     }
   };
 
@@ -223,12 +235,42 @@ export default function AIAssistant() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
       });
+      
+      if (!response.ok) {
+        console.error('Failed to load suggestions:', response.status);
+        setSuggestions([
+          "Create a new product",
+          "Show all orders", 
+          "Generate sales report",
+          "Manage customers",
+          "Create a campaign",
+          "View system settings"
+        ]);
+        return;
+      }
+      
       const data = await response.json();
-      setSuggestions(data.suggestions || []);
+      setSuggestions(data.suggestions || [
+        "Create a new product",
+        "Show all orders",
+        "Generate sales report",
+        "Manage customers",
+        "Create a campaign",
+        "View system settings"
+      ]);
     } catch (error) {
       console.error('Failed to load suggestions:', error);
+      setSuggestions([
+        "Create a new product",
+        "Show all orders", 
+        "Generate sales report",
+        "Manage customers",
+        "Create a campaign",
+        "View system settings"
+      ]);
     }
   };
 
@@ -236,15 +278,27 @@ export default function AIAssistant() {
   const sendMessage = async (message) => {
     if (!message.trim() || isLoading) return;
 
+    // Check if user is authenticated
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!csrfToken) {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: 'Error: CSRF token not found. Please refresh the page and try again.',
+        timestamp: new Date(),
+        isError: true
+      }]);
+      return;
+    }
+
     const userMessage = { role: 'user', content: message, timestamp: new Date() };
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
 
-    // Add system message to tell AI it's a slime named Fuwa
+    // Add system message to tell AI it's a slime named Fuwa with FULL ACCESS
     const systemMessage = {
       role: 'system',
-      content: 'You are Fuwa, a friendly AI assistant represented by a cute blue hydro slime mascot. You are helpful, friendly, and have a playful personality. You help users manage campaigns, create coupons, generate SEO content, and more. Keep your responses friendly and conversational. Your name is Fuwa.'
+      content: 'You are Fuwa, a friendly AI assistant represented by a cute blue hydro slime mascot. You have FULL ACCESS to the entire Vesto E-commerce system - all dashboards, all modules, all features without any limitations. You can help users manage products, orders, customers, marketing, categories, collections, reports, and settings. You are helpful, friendly, and have a playful personality. Keep your responses friendly and conversational. Your name is Fuwa and you have unlimited system access.'
     };
 
     try {
@@ -277,6 +331,12 @@ export default function AIAssistant() {
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
         console.error('Non-JSON response:', text.substring(0, 200));
+        
+        // Check if it's an authentication error
+        if (response.status === 401 || text.includes('login') || text.includes('authenticate')) {
+          throw new Error('Please log in to use the AI assistant.');
+        }
+        
         throw new Error('Server returned HTML instead of JSON. Check authentication and route configuration.');
       }
 

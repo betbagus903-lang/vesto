@@ -9,24 +9,37 @@ class Banner extends Model
 {
     protected $fillable = [
         'type',
+        'slot',
         'title',
         'subtitle',
         'image',
+        'video',
         'button_text',
         'button_link',
         'link_type',
         'link_id',
         'collection_id',
+        'layout_json',
+        'animations',
         'is_active',
+        'featured',
+        'open_in_new_tab',
         'sort_order',
         'start_date',
         'end_date',
+        'cta_style',
+        'text_alignment',
+        'text_color',
+        'display_devices',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'layout_json' => 'array',
+        'animations' => 'array',
+        'display_devices' => 'array',
     ];
 
     public function collection(): BelongsTo
@@ -50,6 +63,11 @@ class Banner extends Model
     public function scopeByType($query, $type)
     {
         return $query->where('type', $type);
+    }
+
+    public function scopeBySlot($query, $slot)
+    {
+        return $query->where('slot', $slot);
     }
 
     public function scopeSorted($query)

@@ -5,11 +5,13 @@ import RichTextEditor from "../../../Components/Admin/RichTextEditor";
 import EditVariantModal from "../../../Components/Admin/EditVariantModal";
 import AddVariantModal from "../../../Components/Admin/AddVariantModal";
 import CategoryMultiSelectTree from "../../../Components/Admin/CategoryMultiSelectTree";
+import { removeBackground } from '@imgly/background-removal';
 import {
     Save, X, Plus, Trash2,
     ChevronDown, ChevronRight,
     Search, Upload, Video,
     PlusCircle, Zap, RefreshCw,
+    Wand2, Loader2,
 } from "lucide-react";
 
 /* ─── shared input style ──────────────────────────────────────── */
@@ -156,14 +158,6 @@ export default function EditProduct({
     attributeFamily = null,
     typeSpecificData = {},
 }) {
-    // DEBUG: Log received props
-    useEffect(() => {
-        console.log('=== Edit.jsx Props ===');
-        console.log('familyGroups:', familyGroups);
-        console.log('typeSpecificData:', typeSpecificData);
-        console.log('configurable_attributes:', typeSpecificData?.configurable_attributes);
-    }, []);
-    
     /* ── parse stored images ─────────────────────────────────── */
     const parseImages = (img) => {
         if (typeof img === "string") { try { return JSON.parse(img); } catch { return []; } }
@@ -199,6 +193,8 @@ export default function EditProduct({
         guest_checkout:     product.guest_checkout !== undefined ? product.guest_checkout : true,
         allow_rma:          !!product.allow_rma,
         rma_rules:          product.rma_rules          || "",
+        enable_variant_background: product.enable_variant_background ?? false,
+        custom_background_color: product.custom_background_color || "#ffffff",
         category_ids:       product.categories?.map(c => c.id)           || [],
         images:             parseImages(product.images),
         videos:             product.videos                                || [],
@@ -209,6 +205,8 @@ export default function EditProduct({
         new_images: [],
         sub_category_id: product.sub_category_id || "",
     });
+
+    const [removingBackground, setRemovingBackground] = useState(null); // Track which image is being processed
 
 
 
@@ -359,6 +357,45 @@ export default function EditProduct({
             setFormData(p => ({ ...p, images: p.images.filter((_, i) => i !== index) }));
         else
             setFormData(p => ({ ...p, new_images: p.new_images.filter((_, i) => i !== index) }));
+    };
+
+    const handleRemoveBackground = async (type, index) => {
+        const imageKey = `${type}-${index}`;
+        setRemovingBackground(imageKey);
+
+        try {
+            let imageUrl;
+            let imageFile;
+
+            if (type === "old") {
+                imageUrl = `/storage/${formData.images[index]}`;
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                imageFile = new File([blob], "image.jpg", { type: blob.type });
+            } else {
+                imageFile = formData.new_images[index];
+            }
+
+            const blob = await removeBackground(imageFile);
+            const newFile = new File([blob], `no-bg-${imageFile.name}`, { type: blob.type });
+
+            if (type === "old") {
+                // Replace old image with new processed image
+                const newImages = [...formData.images];
+                newImages[index] = URL.createObjectURL(newFile);
+                setFormData(p => ({ ...p, images: newImages }));
+            } else {
+                // Replace new image
+                const newImages = [...formData.new_images];
+                newImages[index] = newFile;
+                setFormData(p => ({ ...p, new_images: newImages }));
+            }
+        } catch (error) {
+            console.error('Background removal failed:', error);
+            alert('Failed to remove background. Please try again.');
+        } finally {
+            setRemovingBackground(null);
+        }
     };
 
     /* ── product relation search ─────────────────────────────── */
@@ -642,14 +679,27 @@ export default function EditProduct({
                                     </div>
                                     <span style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>Add Image</span>
                                 </div>
+                                <div className="flex flex-col items-center cursor-pointer" onClick={() => window.open(`/admin/products/design/${product.id}/image/new`, '_blank')}>
+                                    <div style={{ width: 80, height: 80, borderRadius: 8, border: "2px solid #3B82F6", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#3B82F6" }}>
+                                        <Wand2 size={20} style={{ color: "#fff" }} />
+                                    </div>
+                                    <span style={{ fontSize: 11, color: "#3B82F6", marginTop: 6 }}>Design New</span>
+                                </div>
                                 {formData.images.map((img, i) => (
                                     <div key={`old-${i}`} className="flex flex-col items-center relative group">
                                         <button type="button" onClick={() => removeImage("old", i)}
                                             className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <X size={10} style={{ color: "#fff" }} />
                                         </button>
+                                        {/* Design button — per image, correct index */}
+                                        <button type="button"
+                                            onClick={() => window.open(`/admin/products/design/${product.id}/image/${i}`, '_blank')}
+                                            className="absolute -top-2 -left-2 bg-blue-500 rounded-full p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title={`Edit Image ${i + 1} in Designer`}>
+                                            <Wand2 size={10} style={{ color: "#fff" }} />
+                                        </button>
                                         <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #2C3A4D" }}>
-                                            <img src={`/storage/${img}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                            <img src={img.startsWith('blob:') ? img : `/storage/${img}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                         </div>
                                         <span style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>Image {i + 1}</span>
                                     </div>
@@ -963,6 +1013,44 @@ export default function EditProduct({
                                 style={{ ...fld(), height: "auto", padding: "9px 12px", resize: "vertical" }} />
                         </div>
 
+                        {/* Variant Background */}
+                        <div style={card}>
+                            <h2 style={cardTitle}>Variant Background</h2>
+                            <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>Enable to change page background based on variant color</p>
+                            <div className="flex items-center justify-between mb-6">
+                                <span style={{ fontSize: 13, color: "#F8FAFC" }}>Enable Variant Background</span>
+                                <ToggleSwitch name="enable_variant_background" checked={!!formData.enable_variant_background} />
+                            </div>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontSize: 13, color: "#94A3B8", display: "block", marginBottom: 6 }}>Custom Background Color</label>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="color"
+                                        name="custom_background_color"
+                                        value={formData.custom_background_color}
+                                        onChange={handleChange}
+                                        style={{
+                                            width: "60px",
+                                            height: "44px",
+                                            border: "1px solid #1E293B",
+                                            borderRadius: "8px",
+                                            cursor: "pointer",
+                                            backgroundColor: "#0C1524",
+                                        }}
+                                    />
+                                    <input
+                                        type="text"
+                                        name="custom_background_color"
+                                        value={formData.custom_background_color}
+                                        onChange={handleChange}
+                                        placeholder="#ffffff"
+                                        style={inp()}
+                                    />
+                                </div>
+                                <p style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>Used when variant background is disabled</p>
+                            </div>
+                        </div>
+
                         {/* Categories */}
                         <div style={card}>
                             <h2 style={cardTitle}>Categories</h2>
@@ -1092,6 +1180,7 @@ export default function EditProduct({
                 {showEditVariantModal && editingVariant && (
                     <EditVariantModal
                         variant={editingVariant}
+                        productId={product.id}
                         onClose={() => {
                             setShowEditVariantModal(false);
                             setEditingVariant(null);

@@ -46,6 +46,8 @@ use Illuminate\Support\Str;
     'videos',
     'is_active',
     'is_featured',
+    'enable_variant_background',
+    'custom_background_color',
 ])]
 class Product extends Model
 {
@@ -185,6 +187,11 @@ class Product extends Model
     public function configurableAttributes(): HasMany
     {
         return $this->hasMany(ConfigurableAttribute::class);
+    }
+
+    public function questions(): HasMany
+    {
+        return $this->hasMany(ProductQuestion::class);
     }
 
     // Product Type Helpers

@@ -14,6 +14,7 @@ class Order extends Model
         'subtotal', 'tax', 'shipping_amount', 'discount', 'grand_total',
         'payment_status', 'notes',
         'payment_method', 'shipping_method', 'shipping_cost', 'billing_address_id',
+        'coupon_code',
     ];
 
     protected $casts = [
@@ -71,5 +72,10 @@ class Order extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(OrderStatusHistory::class);
     }
 }

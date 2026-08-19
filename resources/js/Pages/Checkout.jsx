@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { ArrowRight, Lock, Truck, CreditCard, MapPin, User, Phone, Mail } from 'lucide-react';
 import Navbar from '../Components/Shared/Navbar';
 
@@ -8,8 +8,12 @@ function fmt(value) {
 }
 
 export default function Checkout() {
+    const { auth } = usePage().props;
+    const user = auth?.user;
     const [cartItems, setCartItems] = useState([]);
     const [currentStep, setCurrentStep] = useState(1); // 1: address, 2: shipping, 3: payment, 4: review
+    const [savedAddresses, setSavedAddresses] = useState([]);
+    const [selectedAddress, setSelectedAddress] = useState(null);
 
     const countries = [
         'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -51,7 +55,15 @@ export default function Checkout() {
 
         // Payment Method
         paymentMethod: '', // cod, transfer
+
+        // Coupon Code
+        couponCode: '',
     });
+
+    const [couponDiscount, setCouponDiscount] = useState(0);
+    const [couponError, setCouponError] = useState('');
+    const [couponSuccess, setCouponSuccess] = useState('');
+    const [appliedCouponId, setAppliedCouponId] = useState(null);
 
     useEffect(() => {
         // Load cart from localStorage
@@ -65,15 +77,63 @@ export default function Checkout() {
         } else {
             router.visit('/cart');
         }
-    }, []);
+
+        // Load saved addresses
+        const savedAddressesData = localStorage.getItem('vesto_addresses');
+        if (savedAddressesData) {
+            const addresses = JSON.parse(savedAddressesData);
+            setSavedAddresses(addresses);
+            // Auto-select default address
+            const defaultAddress = addresses.find(addr => addr.isDefault);
+            if (defaultAddress) {
+                setSelectedAddress(defaultAddress);
+                // Auto-fill form with default address
+                setFormData(prev => ({
+                    ...prev,
+                    firstName: defaultAddress.recipient?.split(' ')[0] || '',
+                    lastName: defaultAddress.recipient?.split(' ').slice(1).join(' ') || '',
+                    phone: defaultAddress.phone || '',
+                    address: defaultAddress.address || '',
+                    city: defaultAddress.city || '',
+                    province: defaultAddress.province || '',
+                    postalCode: defaultAddress.postalCode || '',
+                }));
+            }
+        }
+
+        // Auto-fill with user profile data if available
+        if (user) {
+            setFormData(prev => ({
+                ...prev,
+                firstName: user.name?.split(' ')[0] || prev.firstName,
+                lastName: user.name?.split(' ').slice(1).join(' ') || prev.lastName,
+                email: user.email || prev.email,
+                phone: user.phone || prev.phone,
+            }));
+        }
+    }, [user]);
 
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const shippingCost = formData.shippingMethod === 'express' ? 25000 : (subtotal > 200000 ? 0 : 15000);
-    const total = subtotal + shippingCost;
+    const total = subtotal + shippingCost - couponDiscount;
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSelectAddress = (address) => {
+        setSelectedAddress(address);
+        setFormData(prev => ({
+            ...prev,
+            firstName: address.recipient?.split(' ')[0] || '',
+            lastName: address.recipient?.split(' ').slice(1).join(' ') || '',
+            phone: address.phone || '',
+            address: address.address || '',
+            city: address.city || '',
+            province: address.province || '',
+            postalCode: address.postalCode || '',
+        }));
     };
 
     const handleAddressProceed = () => {
@@ -94,6 +154,47 @@ export default function Checkout() {
         setCurrentStep(4);
     };
 
+    const handleApplyCoupon = async () => {
+        if (!formData.couponCode.trim()) {
+            setCouponError('Please enter a coupon code');
+            setCouponSuccess('');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/coupons/validate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                },
+                body: JSON.stringify({
+                    code: formData.couponCode,
+                    subtotal: subtotal,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setCouponDiscount(data.discount);
+                setAppliedCouponId(data.coupon_id);
+                setCouponSuccess(`Coupon applied! You saved ${fmt(data.discount)}`);
+                setCouponError('');
+            } else {
+                setCouponDiscount(0);
+                setAppliedCouponId(null);
+                setCouponError(data.message || 'Invalid coupon code');
+                setCouponSuccess('');
+            }
+        } catch (error) {
+            setCouponDiscount(0);
+            setAppliedCouponId(null);
+            setCouponError('Failed to validate coupon. Please try again.');
+            setCouponSuccess('');
+        }
+    };
+
     const handlePlaceOrder = () => {
         router.post('/orders', {
             ...formData,
@@ -101,6 +202,7 @@ export default function Checkout() {
             subtotal,
             shippingCost,
             total,
+            couponCode: appliedCouponId ? formData.couponCode : null,
         }, {
             onSuccess: () => {
                 // Clear cart from localStorage
@@ -163,6 +265,35 @@ export default function Checkout() {
                             </div>
 
                             <div className="p-4 border-t border-gray-200">
+                                {/* Saved Addresses */}
+                                {savedAddresses.length > 0 && (
+                                    <div className="mb-4">
+                                        <p className="text-xs font-semibold text-gray-900 mb-2">Saved Addresses</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {savedAddresses.map((address) => (
+                                                <button
+                                                    key={address.id}
+                                                    type="button"
+                                                    onClick={() => handleSelectAddress(address)}
+                                                    className={`p-3 border-2 rounded-lg text-left transition-all ${
+                                                        selectedAddress?.id === address.id
+                                                            ? 'border-gray-900 bg-gray-50'
+                                                            : 'border-gray-200 hover:border-gray-400'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-sm font-semibold text-gray-900">{address.label}</span>
+                                                        {address.isDefault && (
+                                                            <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded">Default</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-600">{address.recipient}</p>
+                                                    <p className="text-xs text-gray-500">{address.address}, {address.city}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-900 mb-1">First Name *</label>
@@ -341,6 +472,33 @@ export default function Checkout() {
                                 ))}
                             </div>
 
+                            {/* Coupon Code */}
+                            <div className="border-t border-gray-200 pt-3 mb-3">
+                                <label className="block text-xs font-semibold text-gray-900 mb-2">Coupon Code</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        name="couponCode"
+                                        value={formData.couponCode}
+                                        onChange={handleInputChange}
+                                        placeholder="Enter coupon code"
+                                        className="flex-1 px-3 py-2 border border-gray-200 rounded focus:outline-none focus:border-gray-400 text-sm"
+                                    />
+                                    <button
+                                        onClick={handleApplyCoupon}
+                                        className="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded hover:bg-gray-800 transition-colors"
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                                {couponError && (
+                                    <p className="text-xs text-red-500 mt-1">{couponError}</p>
+                                )}
+                                {couponSuccess && (
+                                    <p className="text-xs text-green-600 mt-1">{couponSuccess}</p>
+                                )}
+                            </div>
+
                             {/* Totals */}
                             <div className="border-t border-gray-200 pt-3 space-y-2">
                                 <div className="flex justify-between">
@@ -353,6 +511,12 @@ export default function Checkout() {
                                         {shippingCost === 0 ? 'FREE' : fmt(shippingCost)}
                                     </span>
                                 </div>
+                                {couponDiscount > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-green-600">Coupon Discount</span>
+                                        <span className="text-sm font-semibold text-green-600">-{fmt(couponDiscount)}</span>
+                                    </div>
+                                )}
                                 <div className="border-t border-gray-200 pt-2">
                                     <div className="flex justify-between">
                                         <span className="text-base font-bold text-gray-900">Total</span>

@@ -36,9 +36,10 @@ class HandleInertiaRequests extends Middleware
             ],
             'url' => $request->url(),
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
-                'order'   => fn () => $request->session()->get('order'),
+                'success'        => fn () => $request->session()->get('success'),
+                'error'          => fn () => $request->session()->get('error'),
+                'order'          => fn () => $request->session()->get('order'),
+                'createdProduct' => fn () => $request->session()->get('createdProduct'),
             ],
         ];
     }

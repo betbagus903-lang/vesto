@@ -1,5 +1,9 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 /* ---------- tiny inline icon set (no external deps) ---------- */
 const Icon = {
@@ -12,7 +16,7 @@ const Icon = {
   User: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}>
       <circle cx="12" cy="8" r="3.5" />
-      <path d="M4.5 20c1.6-3.6 4.6-5.5 7.5-5.5s5.9 1s9 7.5 5.5" strokeLinecap="round" />
+      <path d="M4.5 20c1.6-3.6 4.6-5.5 7.5-5.5s5.9 1.9 7.5 5.5" strokeLinecap="round" />
     </svg>
   ),
   Bag: (p) => (
@@ -75,6 +79,12 @@ const Icon = {
       <path d="M21 16l-5.5-5.5a2 2 0 0 0-2.8 0L4 19" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  // Logo icon for VESTO
+  Logo: (p) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18l6.9 3.45L12 11.09 5.1 7.63 12 4.18zM4 8.82l7 3.5v7.36l-7-3.5V8.82zm9 10.86v-7.36l7-3.5v7.36l-7 3.5z" />
+    </svg>
+  ),
 };
 
 const Stars = ({ className = 'h-3 w-3' }) => (
@@ -84,6 +94,79 @@ const Stars = ({ className = 'h-3 w-3' }) => (
     ))}
   </div>
 );
+
+/**
+ * MountainAnimation (versi baru — 1 gambar utuh, dibagi jadi "band" horizontal
+ * pakai clip-path, jadi efek render bertahap tapi tetap nyambung sempurna
+ * karena sumbernya cuma 1 file yang sama).
+ */
+const MountainAnimation = ({
+  imageSrc = '/images/mountain-full.png',
+  bandCount = 8,
+  staggerDelay = 0.15,
+  containerHeight = '600px',
+  containerWidth = '100%',
+}) => {
+  const containerRef = useRef(null);
+  const bandRefs = useRef([]);
+
+  useEffect(() => {
+    if (containerRef.current && bandRefs.current.length > 0) {
+      gsap.set(bandRefs.current, { y: '35%', opacity: 0 });
+      gsap.to(bandRefs.current, {
+        y: '0%',
+        opacity: 1,
+        stagger: staggerDelay,
+        duration: 1,
+        ease: 'power2.out',
+      });
+    }
+  }, [imageSrc, bandCount, staggerDelay]);
+
+  const bandHeight = 100 / bandCount;
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative overflow-hidden"
+      style={{
+        height: containerHeight,
+        width: containerWidth,
+        // fade tepi kiri/kanan/bawah biar nyatu ke gradient hero
+        WebkitMaskImage:
+          'linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%), linear-gradient(to bottom, black 75%, transparent 100%)',
+        maskImage:
+          'linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%), linear-gradient(to bottom, black 75%, transparent 100%)',
+        WebkitMaskComposite: 'source-in',
+        maskComposite: 'intersect',
+      }}
+    >
+      {/* band paling bawah dirender belakangan di DOM tapi index-nya dibalik
+          supaya urutan "muncul dari bawah dulu" tetap benar */}
+      {Array.from({ length: bandCount }).map((_, i) => {
+        // i = 0 adalah band paling ATAS (puncak gunung), bandCount-1 = paling BAWAH
+        const reverseIndex = bandCount - 1 - i; // dipakai buat stagger order
+        const top = i * bandHeight;
+        const bottom = 100 - top - bandHeight;
+        return (
+          <div
+            key={i}
+            ref={(el) => (bandRefs.current[reverseIndex] = el)}
+            className="absolute inset-0"
+            style={{ clipPath: `inset(${top}% 0 ${bottom}% 0)` }}
+          >
+            <img
+              src={imageSrc}
+              alt="Mountain"
+              className="h-full w-full object-cover"
+              draggable={false}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 /**
  * Placeholder pengganti foto.
@@ -103,7 +186,7 @@ const PhotoPlaceholder = ({ label, className = '' }) => (
 
 const NAV = [
   { label: 'Home', href: '/welcome', active: true },
-  { label: 'Shop', href: '/shop' },
+  { label: 'Shop', href: '/home', authRequired: true },
   { label: 'Collections', href: '#collections' },
   { label: 'About', href: '#about' },
   { label: 'Journal', href: '#journal' },
@@ -351,9 +434,391 @@ function SpiderWeb({
 }
 
 export default function Welcome({ canLogin, canRegister, auth }) {
-  const [slide, setSlide] = useState(1);
   const [email, setEmail] = useState('');
   const cartCount = 0;
+  const [showLogoText, setShowLogoText] = useState(false);
+  
+  const headerRef = useRef(null);
+  const wordmarkRef = useRef(null);
+  const heroImageRef = useRef(null);
+  const decorativeTextRef = useRef(null);
+  const shopButtonRef = useRef(null);
+  const collectionRef = useRef(null);
+  const dealSectionRef = useRef(null);
+  const mountainRef = useRef(null);
+  const verticalTextRef = useRef(null);
+  const topRightTextRef = useRef(null);
+  const bottomRightTextRef = useRef(null);
+  const spiderWebRef = useRef(null);
+  const logoRef = useRef(null);
+  const featuresRef = useRef(null);
+  const featuredProductsRef = useRef(null);
+  const brandPartnersRef = useRef(null);
+  const instagramFeedRef = useRef(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      // Header animation
+      if (headerRef.current) {
+        gsap.from(headerRef.current, {
+          y: -50,
+          opacity: 0,
+          duration: 1.5,
+          ease: 'power2.inOut',
+          delay: 0,
+        });
+      }
+
+      // Logo animation - icon appears in center, slides left, text appears, icon disappears
+      if (logoRef.current) {
+        // First show icon in center immediately
+        gsap.from(logoRef.current, {
+          scale: 0,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'back.out(1.7)',
+          delay: 0.5,
+          onComplete: () => {
+            // Show text immediately when logo starts sliding
+            setShowLogoText(true);
+            // Then slide icon to left and fade out
+            gsap.to(logoRef.current, {
+              x: -70,
+              opacity: 0,
+              duration: 1,
+              ease: 'power2.inOut',
+              delay: 0, // Start immediately after onComplete
+            });
+          },
+        });
+      }
+
+      // Wordmark animation - starts big and lower, then slowly scales down and moves up
+      if (wordmarkRef.current) {
+        // Start at big size, lower position, and visible immediately
+        gsap.set(wordmarkRef.current, { scale: 1.5, y: 200, opacity: 1 });
+        
+        // Slowly scale down to normal size and move up with smooth animation
+        gsap.to(wordmarkRef.current, {
+          scale: 1,
+          y: -100,
+          duration: 2.5,
+          ease: 'power2.inOut',
+          delay: 0.2,
+        });
+      }
+
+      // Mountain appears immediately as background (no animation on start)
+      // Then scales down after hero image appears
+
+      // Hero image animation - floats up from very bottom, not visible at first
+      if (heroImageRef.current) {
+        gsap.set(heroImageRef.current, { y: 800 });
+        gsap.to(heroImageRef.current, {
+          y: 0,
+          duration: 2,
+          ease: 'power1.inOut',
+          delay: 0.8,
+        });
+      }
+
+      // Mountain animation - starts big, then slowly scales down to normal
+      if (mountainRef.current) {
+        // Start at big size and visible immediately
+        gsap.set(mountainRef.current, { scale: 1.6, opacity: 1 });
+        
+        // Slowly scale down to normal size with smooth animation
+        gsap.to(mountainRef.current, {
+          scale: 1,
+          duration: 2.5,
+          ease: 'power2.inOut',
+          delay: 0.3,
+        });
+      }
+
+      // Decorative text animation
+      if (decorativeTextRef.current) {
+        gsap.from(decorativeTextRef.current, {
+          x: -30,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          delay: 0.6,
+        });
+      }
+
+      // Shop button animation
+      if (shopButtonRef.current) {
+        gsap.from(shopButtonRef.current, {
+          scale: 0.9,
+          opacity: 0,
+          duration: 0.6,
+          ease: 'back.out(1.5)',
+          delay: 0.8,
+        });
+      }
+
+      // Parallax effects for hero elements
+      // Wordmark scroll effect - scales down when scrolling down, reverses when scrolling up
+      if (wordmarkRef.current) {
+        gsap.fromTo(wordmarkRef.current,
+          { scale: 1 },
+          {
+            scale: 0.85,
+            scrollTrigger: {
+              trigger: wordmarkRef.current,
+              start: 'top top',
+              end: 'bottom top',
+              scrub: 1.5,
+            },
+          }
+        );
+      }
+
+
+
+      // Hero image - scales down smoothly when scrolling
+      if (heroImageRef.current) {
+        gsap.to(heroImageRef.current, {
+          scale: 0.85,
+          transformOrigin: "center center",
+          scrollTrigger: {
+            trigger: heroImageRef.current,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 2,
+          },
+        });
+      }
+
+      // Decorative text parallax - moves opposite direction
+      if (decorativeTextRef.current) {
+        gsap.to(decorativeTextRef.current, {
+          y: 50,
+          scrollTrigger: {
+            trigger: decorativeTextRef.current,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 2,
+          },
+        });
+      }
+
+      // Mountain parallax - scales up gradually when scrolling down, back to normal when scrolling up
+      if (mountainRef.current) {
+        gsap.fromTo(mountainRef.current,
+          { scale: 1 },
+          {
+            scale: 1.15,
+            scrollTrigger: {
+              trigger: mountainRef.current,
+              start: 'top center',
+              end: 'bottom center',
+              scrub: 6,
+            },
+          }
+        );
+      }
+
+      // Vertical text parallax - moves faster
+      if (verticalTextRef.current) {
+        gsap.to(verticalTextRef.current, {
+          y: -120,
+          scrollTrigger: {
+            trigger: verticalTextRef.current,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.2,
+          },
+        });
+      }
+
+      // Top right decorative text parallax
+      if (topRightTextRef.current) {
+        gsap.to(topRightTextRef.current, {
+          y: -60,
+          scrollTrigger: {
+            trigger: topRightTextRef.current,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.8,
+          },
+        });
+      }
+
+      // Bottom right decorative text parallax
+      if (bottomRightTextRef.current) {
+        gsap.to(bottomRightTextRef.current, {
+          y: 40,
+          scrollTrigger: {
+            trigger: bottomRightTextRef.current,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 2,
+          },
+        });
+      }
+
+      // Shop button parallax
+      if (shopButtonRef.current) {
+        gsap.to(shopButtonRef.current, {
+          y: 60,
+          scrollTrigger: {
+            trigger: shopButtonRef.current,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.5,
+          },
+        });
+      }
+
+      // SpiderWeb parallax - moves very slowly for depth effect
+      if (spiderWebRef.current) {
+        gsap.to(spiderWebRef.current, {
+          y: -30,
+          scrollTrigger: {
+            trigger: spiderWebRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: 3,
+          },
+        });
+      }
+
+      // Collection cards animation with optimized scroll trigger
+      if (collectionRef.current) {
+        gsap.from(collectionRef.current.children, {
+          y: 60,
+          opacity: 0,
+          stagger: 0.15,
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: collectionRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+      }
+
+      // Deal section animation
+      if (dealSectionRef.current) {
+        gsap.from(dealSectionRef.current, {
+          y: 50,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: dealSectionRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+      }
+
+      // Features section animation
+      if (featuresRef.current) {
+        gsap.from(featuresRef.current.children, {
+          y: 40,
+          opacity: 0,
+          stagger: 0.2,
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: featuresRef.current,
+            start: 'top 80%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+      }
+
+      // Featured Products section animation
+      if (featuredProductsRef.current) {
+        gsap.from(featuredProductsRef.current, {
+          y: 50,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: featuredProductsRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+        
+        gsap.from(featuredProductsRef.current.querySelectorAll('a'), {
+          y: 30,
+          opacity: 0,
+          stagger: 0.1,
+          duration: 0.6,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: featuredProductsRef.current,
+            start: 'top 80%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+      }
+
+      // Brand Partners section animation
+      if (brandPartnersRef.current) {
+        gsap.from(brandPartnersRef.current, {
+          y: 30,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: brandPartnersRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+        
+        gsap.from(brandPartnersRef.current.querySelectorAll('div'), {
+          scale: 0.8,
+          opacity: 0,
+          stagger: 0.1,
+          duration: 0.5,
+          ease: 'back.out(1.7)',
+          scrollTrigger: {
+            trigger: brandPartnersRef.current,
+            start: 'top 80%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+      }
+
+      // Instagram Feed section animation
+      if (instagramFeedRef.current) {
+        gsap.from(instagramFeedRef.current, {
+          y: 50,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: instagramFeedRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+        
+        gsap.from(instagramFeedRef.current.querySelectorAll('a'), {
+          scale: 0.9,
+          opacity: 0,
+          stagger: 0.08,
+          duration: 0.5,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: instagramFeedRef.current,
+            start: 'top 80%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+      }
+    });
+
+    return () => ctx.revert();
+  }, []);
 
   return (
     <>
@@ -407,45 +872,76 @@ export default function Welcome({ canLogin, canRegister, auth }) {
           font-style: normal;
         }
       `}</style>
-      <div className="min-h-screen bg-white text-black antialiased" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="min-h-screen bg-white text-black antialiased" style={{ fontFamily:"'Inter', sans-serif" }}>
+      
       {/* ---------------- Header ---------------- */}
-      <header className="sticky top-0 z-50 bg-transparent">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-4 sm:px-8 sm:py-6">
-          <div className="flex items-center gap-3">
-            <Link href="/welcome" className="text-lg font-black tracking-[0.3em] sm:text-xl">
-              VESTO
-            </Link>
-            <Link href="/earthwell" className="rounded-full border border-black/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-gray-700 transition hover:border-black hover:text-black sm:text-[11px]">
-              Earth Well
-            </Link>
-          </div>
-
-          <nav className="hidden items-center gap-9 text-sm text-gray-600 md:flex">
+      <header ref={headerRef} className="relative z-50 bg-transparent">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-4 sm:px-8 sm:py-6 relative">
+          <nav className="hidden items-center gap-9 text-sm text-white md:flex">
             {NAV.map((item) => (
-              <a
+              <Link
                 key={item.label}
-                href={item.href}
+                href={item.authRequired && !auth?.user ? '/login' : item.href}
                 className={
                   item.active
-                    ? 'border-b border-black pb-1 text-black'
-                    : 'pb-1 transition hover:text-black'
+                    ? 'border-b border-white pb-1 text-white'
+                    : 'pb-1 transition hover:text-white'
                 }
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
+
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <Link href="/welcome" className="relative">
+              <div ref={logoRef} className="h-20 w-20 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                <img src="/images/vesto-logo.png" alt="VESTO Logo" className="h-full w-full object-contain" />
+              </div>
+              <span 
+                className={`text-lg font-black tracking-[0.3em] sm:text-xl text-white transition-all duration-1000 relative z-10 ${
+                  showLogoText ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                VESTO
+              </span>
+            </Link>
+          </div>
 
           <div className="flex items-center gap-3 text-black sm:gap-6">
             <button aria-label="Search" className="hidden md:block">
               <Icon.Search className="h-[18px] w-[18px]" />
             </button>
-            <button aria-label="Account" className="hidden md:block">
-              <Icon.User className="h-[18px] w-[18px]" />
-            </button>
+            
+            {auth?.user ? (
+              // Authenticated user menu
+              <div className="hidden md:flex items-center gap-4">
+                <Link href="/home" className="flex items-center gap-1.5 hover:text-gray-700 transition-colors">
+                  <Icon.User className="h-[18px] w-[18px]" />
+                  <span className="text-sm">Account</span>
+                </Link>
+                <Link href={auth.user.role === 'admin' ? '/admin/dashboard' : '/buyer/dashboard'} className="text-sm hover:text-gray-700 transition-colors">
+                  Dashboard
+                </Link>
+                <Link href="/logout" method="post" className="text-sm hover:text-gray-700 transition-colors">
+                  Logout
+                </Link>
+              </div>
+            ) : (
+              // Guest user - show login/register
+              <div className="hidden md:flex items-center gap-4">
+                <Link href="/login" className="text-sm hover:text-gray-700 transition-colors">
+                  Sign In
+                </Link>
+                <Link href="/register" className="text-sm font-semibold hover:text-gray-700 transition-colors">
+                  Create Account
+                </Link>
+              </div>
+            )}
+            
             <button aria-label="Cart" className="flex items-center gap-1.5">
               <Icon.Bag className="h-[18px] w-[18px]" />
-              <span className="text-sm text-gray-500">({cartCount})</span>
+              <span className="text-sm text-black">({cartCount})</span>
             </button>
           </div>
         </div>
@@ -454,96 +950,48 @@ export default function Welcome({ canLogin, canRegister, auth }) {
       <main>
         {/* ---------------- Hero ---------------- */}
         <section className="relative -mt-20 min-h-[640px] overflow-hidden border-b border-black/10 sm:min-h-[700px] lg:min-h-screen">
-          {slide === 1 && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-0"
-              style={{
-                background:
-                  'linear-gradient(135deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.92) 44%, rgba(0,0,0,0.25) 52%, rgba(255,255,255,0.9) 60%, rgba(255,255,255,1) 100%)',
-              }}
-            />
-          )}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.92) 44%, rgba(0,0,0,0.25) 52%, rgba(255,255,255,0.9) 60%, rgba(255,255,255,1) 100%)',
+            }}
+          />
 
-          <SpiderWeb className="absolute inset-0 z-[10] opacity-100" alwaysWhite={slide === 2} />
-
-          {slide === 1 && (
-            <div className="relative z-[2] mx-auto max-w-[1600px] px-4 pt-10 sm:px-8">
-             
-            </div>
-          )}
-
-          {slide === 2 && (
-            <div className="relative z-[2] mx-auto max-w-[1600px] px-4 pt-10 sm:px-8">
-              <p className="text-xs font-medium uppercase tracking-[0.35em] text-gray-500">
-            
-              </p>
-            </div>
-          )}
-
-          {/* ========== SHARED CONTROLS RIGHT RAIL ========== */}
-          <div className="absolute right-0 top-0 z-20 hidden h-[700px] w-16 flex-col items-center justify-between py-2 lg:flex">
-            <div className="flex flex-col items-center gap-3 text-xs font-semibold tracking-[0.2em] text-gray-400">
-              <span className={slide === 1 ? 'text-black' : ''}>01</span>
-              <div className="h-14 w-px bg-gray-300" />
-              <span className={slide === 2 ? 'text-black' : ''}>02</span>
-              <span className={slide === 3 ? 'text-black' : ''}>03</span>
-            </div>
-
-            <p className="w-24 text-center text-[11px] leading-5 text-gray-500">
-             
-            </p>
-
-            <div className="flex flex-col gap-2">
-              <button
-                aria-label="Previous"
-                onClick={() => setSlide((s) => (s === 1 ? 3 : s - 1))}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 transition hover:border-black"
-              >
-                <Icon.ArrowLeft className="h-4 w-4" />
-              </button>
-              <button
-                aria-label="Next"
-                onClick={() => setSlide((s) => (s === 3 ? 1 : s + 1))}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white"
-              >
-                <Icon.ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
+          <div ref={spiderWebRef} className="absolute inset-0 z-[10] opacity-100">
+            <SpiderWeb className="absolute inset-0" alwaysWhite={false} />
           </div>
 
+
+
           {/* ========== HERO 1 CONTAINER ========== */}
-          {slide === 1 && (
-            <div key="hero-1" className="relative z-[2] mx-auto mt-14 h-[520px] max-w-[1600px] px-4 sm:mt-6 sm:h-[620px] sm:px-8 md:mt-2 md:h-[769px] hero-slide-up">
+            <div className="relative z-[2] mx-auto mt-14 h-[520px] max-w-[1600px] px-4 sm:mt-6 sm:h-[620px] sm:px-8 md:mt-2 md:h-[769px] hero-slide-up">
                 
               {/* giant wordmark, behind everything */}
               <h1
+                ref={wordmarkRef}
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-[48%] z-0 -translate-y-1/2 select-none whitespace-nowrap text-[28vw] font-black uppercase leading-none tracking-[-0.05em] text-white mix-blend-difference sm:inset-x-4 sm:text-[22vw] md:inset-x-8 md:text-[16vw]"
+                className="pointer-events-none absolute left-[5%] top-[55%] z-0 -translate-y-1/2 select-none whitespace-nowrap text-[28vw] font-black uppercase leading-none tracking-[-0.05em] text-white mix-blend-difference sm:left-[10%] sm:text-[22vw] md:left-[15%] md:text-[16vw]"
               >
-                <span className="inline-block">V</span>
-                <span className="inline-block">E</span>
+                <span className="inline-block">F</span>
+                <span className="inline-block">A</span>
                 <span className="inline-block">S</span>
-                <span className="inline-block">T</span>
-                <span className="inline-block text-black/70 mix-blend-normal">O</span>
+                <span className="inline-block">H</span>
+                <span className="inline-block text-white">I</span>
+                <span className="inline-block text-white">O</span>
+                <span className="inline-block text-white">N</span>
               </h1>
 
-              {/* Top left decorative text */}
-              <div className="absolute left-4 top-0 z-10 hidden sm:block md:left-8">
-                <p className="text-xs font-medium uppercase tracking-[0.35em] text-gray-500">
-                New Collection 2026
-              </p>
-              </div>
-
               {/* Bottom left decorative text */}
-              <div className="absolute left-4 bottom-0 z-10 hidden md:block md:left-8">
+              <div ref={decorativeTextRef} className="absolute left-4 bottom-0 z-10 hidden md:block md:left-8">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-black/70">
                   Premium Quality
                 </p>
               </div>
 
               {/* Hero model image */}
-              <div className="absolute bottom-0 left-1/2 z-[40] pointer-events-none -translate-x-1/2 md:left-[430px] md:translate-x-0 md:translate-y-[140px]">
+              <div ref={heroImageRef} className="absolute bottom-[-250px] left-1/2 z-[50] pointer-events-none -translate-x-1/2 md:left-[430px] md:translate-x-0">
                 <img
                   src="/images/hero-model.jpg"
                   alt="Model"
@@ -553,53 +1001,35 @@ export default function Welcome({ canLogin, canRegister, auth }) {
                 <div className="absolute inset-0 z-[60]" style={{ pointerEvents: 'auto' }} />
               </div>
 
-              {/* floating product card — top left of image */}
-              <div className="absolute left-[6%] top-[8%] z-20 hidden w-64 items-center gap-3 rounded-2xl border border-black/10 bg-white/95 p-3 shadow-xl backdrop-blur md:flex">
-                <PhotoPlaceholder label="Foto: Essential Tee" className="h-14 w-14 rounded-lg" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold">Essential Tee</p>
-                  <p className="text-xs text-gray-500">IDR 249.000</p>
-                  <Stars className="mt-1 h-2.5 w-2.5" />
-                </div>
-                <button
-                  aria-label="Add Essential Tee to cart"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white"
-                >
-                  <Icon.Plus className="h-3.5 w-3.5" />
-                </button>
+              {/* Mountain Animation Section */}
+              <div ref={mountainRef} className="absolute bottom-0 left-0 right-0 z-[10] pointer-events-none -mb-56 -ml-60">
+                <MountainAnimation
+                  imageSrc="/images/mountain-full.png"
+                  bandCount={8}
+                  staggerDelay={0.15}
+                  containerHeight="800px"
+                  containerWidth="120%"
+                />
               </div>
 
-              {/* floating product card — bottom right of image */}
-              <div className="absolute bottom-[30%] right-[2%] z-20 hidden w-64 items-center gap-3 rounded-2xl border border-black/10 bg-white/95 p-3 shadow-xl backdrop-blur md:flex">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold">Relaxed Pants</p>
-                  <p className="text-xs text-gray-500">IDR 399.000</p>
-                  <Stars className="mt-1 h-2.5 w-2.5" />
-                </div>
-                <button
-                  aria-label="Add Relaxed Pants to cart"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white"
-                >
-                  <Icon.Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
+
 
               {/* Vertical text on the right */}
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 z-10 hidden md:block">
+              <div ref={verticalTextRef} className="absolute right-8 top-1/2 -translate-y-1/2 z-10 hidden md:block">
                 <p className="text-xs font-black uppercase text-black/70" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '2em' }}>
                   REDEFINE YOUR STYLE
                 </p>
               </div>
 
               {/* Top right decorative text */}
-              <div className="absolute right-4 top-0 z-10 hidden sm:block md:right-8">
+              <div ref={topRightTextRef} className="absolute right-4 top-0 z-10 hidden sm:block md:right-8">
                 <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-black/40">
                   EST. 2026
                 </p>
               </div>
 
               {/* Bottom right decorative text */}
-              <div className="absolute right-4 bottom-0 z-10 hidden md:block md:right-8">
+              <div ref={bottomRightTextRef} className="absolute right-4 bottom-0 z-10 hidden md:block md:right-8">
                 <div className="flex items-center gap-2">
                   <div className="h-px w-8 bg-black/30" />
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/60">
@@ -609,210 +1039,166 @@ export default function Welcome({ canLogin, canRegister, auth }) {
               </div>
 
               {/* Shop Now button */}
-              <div className="absolute left-4 bottom-6 z-20 sm:left-8 sm:bottom-8">
-                <Link
-                  href="/shop"
-                  className="inline-flex items-center gap-3 rounded-full bg-black px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-gray-900 sm:px-6 sm:text-xs"
+              <div ref={shopButtonRef} className="absolute left-4 bottom-6 z-20 sm:left-8 sm:bottom-8">
+                <button
+                  onClick={() => router.visit('/shop')}
+                  className="inline-flex items-center gap-3 rounded-full bg-black px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-gray-900 sm:px-6 sm:text-xs cursor-pointer"
                 >
                   Shop Now
                   <Icon.ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* ========== HERO 2 CONTAINER ========== */}
-          {slide === 2 && (
-            <div key="hero-2" className="relative z-[2] h-[calc(99vh-0px)] -mt-20 overflow-hidden sm:overflow-visible hero-slide-right">
-              {/* Background image - FULL WIDTH */}
-              <div
-                className="pointer-events-none absolute inset-0 z-0 w-full h-full"
-                style={{
-                  backgroundImage: 'url(/images/hero-2-bg.jpg)',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center 30%',
-                  backgroundRepeat: 'no-repeat',
-                  height: '120%',
-                  top: '-5%',
-                }}
-              />
-
-              {/* Content wrapper */}
-              <div className="relative mx-auto h-full max-w-[1600px] px-4 sm:px-8">
-                {/* Label di atas */}
-                <div className="absolute left-4 top-6 z-10 sm:left-12">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.35em] text-gray-500 sm:text-xs">
-                    New Collection 2026
-                  </p>
-                </div>
-
-                {/* ELEGANCE - serif heading */}
-                <h2
-                  className="pointer-events-none absolute left-4 top-16 z-10 select-none text-[40px] leading-none text-black sm:left-12 sm:top-24 sm:text-[64px] md:text-[80px] lg:text-[100px]"
-                  style={{ fontFamily: 'Georgia, Garamond, serif', fontWeight: '400', letterSpacing: '-0.03em' }}
-                >
-                  ELEGANCE
-                </h2>
-
-                {/* Divider line */}
-                <div className="pointer-events-none absolute left-4 top-[120px] z-10 h-px w-12 bg-black sm:left-12 sm:top-56 sm:w-24" />
-
-                {/* NEW ARRIVAL - label */}
-                <p className="pointer-events-none absolute left-4 top-[136px] z-10 text-[10px] font-semibold uppercase tracking-widest text-gray-800 sm:left-12 sm:top-64 sm:text-[11px]">
-                  New Arrival
-                </p>
-
-                {/* Description text */}
-                <p className="pointer-events-none absolute left-4 top-[160px] z-10 max-w-[12rem] text-[11px] leading-relaxed text-gray-700 sm:left-12 sm:top-72 sm:max-w-xs sm:text-[14px]">
-                  Timeless pieces. Modern silhouettes.<br />
-                  Designed to elevate your everyday.
-                </p>
-
-                {/* Explore Collection button */}
-                <button className="absolute bottom-20 left-4 z-10 border-2 border-black bg-black px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-white transition hover:bg-gray-900 sm:bottom-32 sm:left-12 sm:px-8 sm:py-3 sm:text-[11px]">
-                  Explore Collection →
                 </button>
               </div>
             </div>
-          )}
 
- {/* ========== HERO 3 CONTAINER ========== */}
-          {slide === 3 && (
-            <div key="hero-3" className="relative z-[2] min-h-[calc(100vh-0px)] overflow-hidden hero-slide-left" style={{ backgroundColor: '#D5D5D3' }}>
-              {/* Background image */}
-              <div
-                className="pointer-events-none absolute inset-0 z-0 w-full"
-                style={{
-                  backgroundImage: 'url(/images/hero-3-bg.jpg)',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center 30%',
-                  backgroundRepeat: 'no-repeat',
-                  height: '111%',
-                  top: '-5%',
-                }}
-              />
 
-              {/* Sorotan Cahaya Terang Miring */}
-              <div
-                className="pointer-events-none absolute -left-20 top-20 z-10 h-[800px] w-[200px] sm:h-[1500px] sm:w-[300px]"
-                style={{
-                  background: 'linear-gradient(65deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.8) 40%, transparent 80%)',
-                  transform: 'rotate(-40deg)',
-                  transformOrigin: 'top right',
-                  mixBlendMode: 'screen',
-                  filter: 'blur(10px)',
-                }}
-              />
+          <div className="relative z-[2] mx-auto max-w-[1600px] px-4 pb-4 pt-2 sm:px-8">
+            <p className="max-w-sm text-sm leading-6 text-gray-600">
+              Timeless design. Premium quality. Made for everyday confidence.
+            </p>
+          </div>
+        </section>
 
-              {/* Content wrapper */}
-              <div className="relative mx-auto h-full max-w-[1600px] px-4 sm:px-8">
-                {/* Label */}
-                <div className="absolute top-16 left-4 z-20 sm:left-12 md:top-[90px] md:left-[90px]">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#6B7280] sm:text-[12px] sm:tracking-[0.45em]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    SPRING / SUMMER 2026
-                  </p>
+        {/* ---------------- New Section Below Hero ---------------- */}
+        <section ref={featuresRef} className="relative py-24 bg-white">
+          <div className="mx-auto max-w-[1600px] px-4 sm:px-8">
+            <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-3">
+              {/* Feature 1 */}
+              <div className="flex flex-col gap-4">
+                <div className="h-12 w-12 rounded-full bg-black flex items-center justify-center">
+                  <Icon.Truck className="h-6 w-6 text-white" />
                 </div>
+                <h3 className="text-lg font-bold uppercase tracking-[0.2em]">Free Shipping</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Enjoy complimentary shipping on all orders worldwide. No minimum purchase required.
+                </p>
+              </div>
 
-                {/* Title */}
-                <div className="absolute top-28 left-4 z-20 sm:left-12 sm:top-32 md:top-[350px] md:left-[90px]">
-                  <h2 className="text-[48px] font-medium leading-[0.95] tracking-[-0.03em] text-black sm:text-[72px] md:text-[100px]" style={{ fontFamily: "'Cormorant Garamond', Georgia, 'Times New Roman', Times, serif" }}>
-                    Define<br />
-                    <em>Your  </em>
-                     Edge.
-                  </h2>
+              {/* Feature 2 */}
+              <div className="flex flex-col gap-4">
+                <div className="h-12 w-12 rounded-full bg-black flex items-center justify-center">
+                  <Icon.Shield className="h-6 w-6 text-white" />
                 </div>
+                <h3 className="text-lg font-bold uppercase tracking-[0.2em]">Secure Payment</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Shop with confidence using our encrypted payment system. Your data is always protected.
+                </p>
+              </div>
 
-                {/* Thin line below title */}
-                <div className="absolute top-[200px] left-4 z-20 sm:left-12 sm:top-[310px] md:top-[560px] md:left-[90px]">
-                  <div className="h-[1px] w-[40px] bg-[#1F1F1F] sm:w-[50px]" />
+              {/* Feature 3 */}
+              <div className="flex flex-col gap-4">
+                <div className="h-12 w-12 rounded-full bg-black flex items-center justify-center">
+                  <Icon.Refresh className="h-6 w-6 text-white" />
                 </div>
-
-                {/* Description */}
-                <div className="absolute top-[220px] left-4 z-20 max-w-[14rem] sm:left-12 sm:top-[340px] sm:max-w-md md:top-[590px] md:left-[90px]">
-                  <p className="text-[14px] font-normal leading-relaxed text-[#666] sm:text-[16px] md:text-[18px]" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    Modern essentials. <br />
-                  Designed to move with you.
-                  </p>
-                </div>
-
-                {/* Button */}
-                <div className="absolute left-4 bottom-16 z-20 sm:left-12 sm:bottom-24 md:left-[90px] md:bottom-32">
-                  <button className="text-[10px] font-semibold uppercase tracking-widest text-black border-b border-black pb-1 transition hover:text-gray-700 sm:text-[11px]" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    EXPLORE COLLECTION →
-                  </button>
-                </div>
+                <h3 className="text-lg font-bold uppercase tracking-[0.2em]">Easy Returns</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Not satisfied? Return your items within 30 days for a full refund. No questions asked.
+                </p>
               </div>
             </div>
-          )}
-          <div className="relative z-[2] mx-auto max-w-[1600px] px-4 pb-4 pt-2 sm:px-8">
-            {slide === 1 && (
-              <p className="max-w-sm text-sm leading-6 text-gray-600">
-                Timeless design. Premium quality. Made for everyday confidence.
-              </p>
-            )}
           </div>
         </section>
 
        {/* ---------------- Explore Collection ---------------- */}
-<section id="collections" className="border-b border-black/10 py-20">
+<section id="collections" className="border-b border-black/10 py-24 bg-white">
   <div className="mx-auto max-w-[1600px] px-4 sm:px-8">
-    <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">
-        Explore Collection
-      </p>
-      <Link href="/shop" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-black">
-        View all collections
-        <Icon.ArrowRight className="h-3.5 w-3.5" />
-      </Link>
+    <div className="mb-20 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500 mb-4">
+          Explore Collection
+        </p>
+        <h2 className="text-6xl md:text-8xl font-black text-gray-900 tracking-tighter leading-none">
+          NEW
+          <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-400">
+            ARRIVALS
+          </span>
+        </h2>
+      </div>
+      <div className="max-w-md">
+        <p className="text-gray-600 leading-relaxed">
+          Explore our latest collection featuring contemporary designs crafted for the modern individual. Each piece tells a story of quality and style.
+        </p>
+      </div>
     </div>
 
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div ref={collectionRef} className="grid gap-6 md:grid-cols-2 lg:grid-cols-12">
       
-      {/* Kartu 1: Men */}
-      <Link href="/shop/men" className="group relative flex h-56 items-end overflow-hidden bg-gray-100 sm:h-64">
-        <img src="/images/mens.png" alt="Men's Wear" className="absolute inset-0 h-full w-full object-cover object-top transition duration-700 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-transparent opacity-90" />
-        <div className="relative z-10 px-5 py-5 sm:px-6 sm:py-6">
-          <p className="text-xl font-black tracking-tight sm:text-2xl">Men's Wear</p>
-          <span className="mt-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-gray-700">
-            Shop Now
-            <Icon.ArrowRight className="h-3 w-3" />
-          </span>
+      {/* Kartu 1: Men - Large card spanning 7 columns */}
+      <div className="group relative lg:col-span-7 h-[500px] md:h-[600px] overflow-hidden bg-gray-900">
+        <div className="absolute inset-0 flex flex-col justify-between p-8 md:p-12">
+          <div className="flex justify-between items-start">
+            <span className="text-white/40 text-xs font-mono">01/03</span>
+            <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center group-hover:bg-white group-hover:border-white transition-all duration-500">
+              <Icon.ArrowRight className="h-5 w-5 text-white group-hover:text-black transition-colors" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-5xl md:text-7xl font-black text-white tracking-tighter">MEN</h3>
+            <p className="text-white/70 text-lg max-w-sm">Redefining masculinity with contemporary elegance</p>
+          </div>
         </div>
-      </Link>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+      </div>
 
-      {/* Kartu 2: Women */}
-      <Link href="/shop/women" className="group relative flex h-56 items-end overflow-hidden bg-gray-100 sm:h-64">
-        <img src="/images/womens.png" alt="Women's Wear" className="absolute inset-0 h-full w-full object-cover object-top transition duration-700 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-transparent opacity-90" />
-        <div className="relative z-10 px-5 py-5 sm:px-6 sm:py-6">
-          <p className="text-xl font-black tracking-tight sm:text-2xl">Women's Wear</p>
-          <span className="mt-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-gray-700">
-            Shop Now
-            <Icon.ArrowRight className="h-3 w-3" />
-          </span>
+      {/* Kartu 2: Women - Tall card spanning 5 columns */}
+      <div className="group relative lg:col-span-5 h-[500px] md:h-[600px] overflow-hidden bg-rose-200">
+        <div className="absolute inset-0 flex flex-col justify-between p-8 md:p-12">
+          <div className="flex justify-between items-start">
+            <span className="text-rose-900/40 text-xs font-mono">02/03</span>
+            <div className="w-12 h-12 rounded-full border border-rose-900/20 flex items-center justify-center group-hover:bg-rose-900 group-hover:border-rose-900 transition-all duration-500">
+              <Icon.ArrowRight className="h-5 w-5 text-rose-900 group-hover:text-white transition-colors" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-5xl md:text-7xl font-black text-rose-900 tracking-tighter">WOMEN</h3>
+            <p className="text-rose-900/70 text-lg max-w-sm">Where elegance meets everyday sophistication</p>
+          </div>
         </div>
-      </Link>
+      </div>
 
-      {/* Kartu 3: Accessories */}
-      <Link href="/shop/accessories" className="group relative flex h-56 items-end overflow-hidden bg-gray-100 sm:h-64">
-        <img src="/images/akso.png" alt="Accessories" className="absolute inset-0 h-full w-full object-cover object-top transition duration-700 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-transparent opacity-90" />
-        <div className="relative z-10 px-5 py-5 sm:px-6 sm:py-6">
-          <p className="text-xl font-black tracking-tight sm:text-2xl">Accessories</p>
-          <span className="mt-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-gray-700">
-            Shop Now
-            <Icon.ArrowRight className="h-3 w-3" />
-          </span>
+      {/* Kartu 3: Accessories - Wide card spanning full width */}
+      <div className="group relative lg:col-span-12 h-[300px] md:h-[350px] overflow-hidden bg-amber-200">
+        <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-between p-8 md:p-16">
+          <div className="space-y-4 mb-8 md:mb-0">
+            <span className="text-amber-900/40 text-xs font-mono">03/03</span>
+            <h3 className="text-5xl md:text-7xl font-black text-amber-900 tracking-tighter">ACCESSORIES</h3>
+            <p className="text-amber-900/70 text-lg max-w-md">Complete your look with carefully curated accessories that define your personal style</p>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-amber-900/60 text-sm mb-1">Starting from</p>
+              <p className="text-3xl font-black text-amber-900">$29</p>
+            </div>
+            <div className="w-16 h-16 rounded-full bg-amber-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+              <Icon.ArrowRight className="h-6 w-6 text-white" />
+            </div>
+          </div>
         </div>
-      </Link>
+      </div>
 
+    </div>
+
+    <div className="mt-20 flex flex-col md:flex-row items-center justify-between gap-8">
+      <div className="flex items-center gap-8">
+        <div className="text-center">
+          <p className="text-4xl font-black text-gray-900">200+</p>
+          <p className="text-gray-500 text-sm">New Items</p>
+        </div>
+        <div className="h-12 w-px bg-gray-300" />
+        <div className="text-center">
+          <p className="text-4xl font-black text-gray-900">50%</p>
+          <p className="text-gray-500 text-sm">Limited Edition</p>
+        </div>
+      </div>
+      <Link href="/shop" className="group inline-flex items-center gap-4 px-10 py-4 bg-black text-white font-bold uppercase tracking-[0.2em] hover:bg-gray-900 transition-all duration-300">
+        SHOP ALL COLLECTIONS
+        <Icon.ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />
+      </Link>
     </div>
   </div>
 </section>
 
         {/* ---------------- Deal of the Month + Testimonial + Features ---------------- */}
-        <section className="border-b border-black/10 py-20">
+        <section ref={dealSectionRef} className="border-b border-black/10 py-20">
           <div className="mx-auto grid max-w-[1600px] gap-4 px-4 sm:px-8 lg:grid-cols-[1fr_1fr_0.9fr]">
             {/*
              
@@ -905,6 +1291,82 @@ export default function Welcome({ canLogin, canRegister, auth }) {
                 Subscribe
               </button>
             </form>
+          </div>
+        </section>
+
+        {/* ---------------- Featured Products ---------------- */}
+        <section ref={featuredProductsRef} className="border-b border-black/10 py-20">
+          <div className="mx-auto max-w-[1600px] px-4 sm:px-8">
+            <div className="mb-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">
+                Featured Products
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Best Sellers</h2>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
+                <Link key={item} href="/shop" className="group">
+                  <div className="relative mb-4 overflow-hidden rounded-xl bg-gray-100">
+                    <div className="aspect-[3/4] flex items-center justify-center">
+                      <span className="text-gray-400 text-sm">Product Image {item}</span>
+                    </div>
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button className="h-8 w-8 rounded-full bg-white flex items-center justify-center shadow-lg">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900">Product Name {item}</h3>
+                  <p className="text-sm text-gray-600">$99.00</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- Brand Partners ---------------- */}
+        <section ref={brandPartnersRef} className="py-16 bg-gray-50">
+          <div className="mx-auto max-w-[1600px] px-4 sm:px-8">
+            <p className="text-center text-xs font-semibold uppercase tracking-[0.3em] text-gray-500 mb-8">
+              Trusted by Leading Brands
+            </p>
+            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+              {[1, 2, 3, 4, 5].map((brand) => (
+                <div key={brand} className="h-12 w-24 bg-gray-200 rounded flex items-center justify-center">
+                  <span className="text-gray-400 text-xs">Brand {brand}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- Instagram Feed ---------------- */}
+        <section ref={instagramFeedRef} className="border-b border-black/10 py-20">
+          <div className="mx-auto max-w-[1600px] px-4 sm:px-8">
+            <div className="mb-8 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gray-500">
+                Follow Us
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">@vesto_official</h2>
+            </div>
+
+            <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
+              {[1, 2, 3, 4, 5, 6].map((item) => (
+                <a key={item} href="#" className="group relative aspect-square overflow-hidden bg-gray-100">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-gray-400 text-xs">Instagram {item}</span>
+                  </div>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                  </div>
+                </a>
+              ))}
+            </div>
           </div>
         </section>
       </main>

@@ -30,8 +30,12 @@ export const LanguageProvider = ({ children }) => {
     return translations[language][key] || translations['en'][key] || key;
   };
 
+  const currency = language === 'id' ? 'IDR' : 'USD';
+  const currencySymbol = language === 'id' ? 'Rp' : '$';
+  const currencyRate = language === 'id' ? 15000 : 1; // USD to IDR rate
+
   return (
-    <LanguageContext.Provider value={{ language, changeLanguage, t }}>
+    <LanguageContext.Provider value={{ language, changeLanguage, t, currency, currencySymbol, currencyRate }}>
       {children}
     </LanguageContext.Provider>
   );

@@ -21,8 +21,8 @@ class CategoryTool extends BaseTool
         return [
             'action' => [
                 'type' => 'string',
-                'description' => 'Action to perform: create, update, or delete',
-                'enum' => ['create', 'update', 'delete']
+                'description' => 'Action to perform: create, update, delete, view, index',
+                'enum' => ['create', 'update', 'delete', 'view', 'index']
             ],
             'name' => [
                 'type' => 'string',
@@ -40,12 +40,16 @@ class CategoryTool extends BaseTool
                 'type' => 'number',
                 'description' => 'Display position/order (optional, default: 0)'
             ],
+            'category_id' => [
+                'type' => 'number',
+                'description' => 'Category ID (required for view action)'
+            ],
         ];
     }
 
     protected function getRequiredParameters(): array
     {
-        return ['action', 'name'];
+        return ['action'];
     }
 
     public function execute(array $parameters): array
@@ -53,7 +57,7 @@ class CategoryTool extends BaseTool
         if (!$this->validate($parameters)) {
             return [
                 'success' => false,
-                'error' => 'Missing required parameters: action and name are required'
+                'error' => 'Missing required parameter: action'
             ];
         }
 
@@ -67,10 +71,14 @@ class CategoryTool extends BaseTool
                     return $this->updateCategory($parameters);
                 case 'delete':
                     return $this->deleteCategory($parameters);
+                case 'view':
+                    return $this->viewCategory($parameters);
+                case 'index':
+                    return $this->indexCategories();
                 default:
                     return [
                         'success' => false,
-                        'error' => "Invalid action: {$action}. Must be create, update, or delete."
+                        'error' => "Invalid action: {$action}. Must be create, update, delete, view, or index."
                     ];
             }
         } catch (\Exception $e) {
@@ -208,6 +216,41 @@ class CategoryTool extends BaseTool
         return [
             'success' => true,
             'message' => "Category '{$categoryName}' deleted successfully"
+        ];
+    }
+
+    private function viewCategory(array $parameters): array
+    {
+        if (!isset($parameters['category_id'])) {
+            return [
+                'success' => false,
+                'error' => 'Missing required parameter: category_id'
+            ];
+        }
+
+        $category = Category::with(['parent', 'children', 'products'])->find($parameters['category_id']);
+        if (!$category) {
+            return [
+                'success' => false,
+                'error' => "Category not found"
+            ];
+        }
+
+        return [
+            'success' => true,
+            'data' => $category->toArray()
+        ];
+    }
+
+    private function indexCategories(): array
+    {
+        $categories = Category::with(['parent', 'children'])->orderBy('position')->orderBy('name')->get();
+
+        return [
+            'success' => true,
+            'data' => $categories->toArray(),
+            'count' => $categories->count(),
+            'message' => "Found {$categories->count()} categories"
         ];
     }
 }

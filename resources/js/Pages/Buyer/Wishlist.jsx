@@ -1,103 +1,352 @@
 import { Link } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { useBuyerTheme } from '../../Context/BuyerThemeContext';
+import AccountSidebar from '../../Components/Buyer/AccountSidebar';
+import { Search, Heart, ShoppingBag, Trash2, ChevronDown, Star, ShoppingCart, Bell, Tag, Moon, Sun, Menu, X } from 'lucide-react';
 
-export default function Wishlist({ user }) {
+export default function Wishlist() {
+    const { wishlistProducts: dbWishlistProducts } = usePage().props;
+    const { theme, toggleTheme } = useBuyerTheme();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    const themeStyles = {
+        dark: {
+            bg: 'bg-[#0a0f1a]',
+            headerBg: 'bg-[#0a1628]',
+            border: 'border-white/10',
+            text: 'text-white',
+            textMuted: 'text-white/50',
+            textMutedLight: 'text-white/40',
+            cardBg: 'bg-white/5',
+            cardBgLight: 'bg-white/10',
+            hoverBg: 'hover:bg-white/10',
+            inputBg: 'bg-white/5',
+        },
+        light: {
+            bg: 'bg-gray-50',
+            headerBg: 'bg-white',
+            border: 'border-gray-200',
+            text: 'text-gray-900',
+            textMuted: 'text-gray-600',
+            textMutedLight: 'text-gray-400',
+            cardBg: 'bg-white',
+            cardBgLight: 'bg-gray-100',
+            hoverBg: 'hover:bg-gray-100',
+            inputBg: 'bg-gray-100',
+        },
+    };
+
+    const styles = themeStyles[theme];
+
+    // Mock data for testing if no data from backend
+    const mockWishlistProducts = [
+        {
+            id: 1,
+            product_id: 1,
+            name: 'Oversized Denim Jacket',
+            price: 699000,
+            original_price: null,
+            discount: null,
+            image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&h=500&fit=crop',
+            rating: 4,
+            reviews: 45,
+        },
+        {
+            id: 2,
+            product_id: 2,
+            name: 'Minimal Sneakers',
+            price: 679000,
+            original_price: 799000,
+            discount: 15,
+            image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
+            rating: 5,
+            reviews: 78,
+        },
+        {
+            id: 3,
+            product_id: 3,
+            name: 'Leather Crossbody Bag',
+            price: 459000,
+            original_price: null,
+            discount: null,
+            image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&h=500&fit=crop',
+            rating: 4,
+            reviews: 32,
+        },
+        {
+            id: 4,
+            product_id: 4,
+            name: 'Oversized Shirt',
+            price: 299000,
+            original_price: 399000,
+            discount: 25,
+            image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=500&fit=crop',
+            rating: 4,
+            reviews: 56,
+        },
+    ];
+
+    const wishlistProducts = dbWishlistProducts && dbWishlistProducts.length > 0 ? dbWishlistProducts : mockWishlistProducts;
+
     return (
-        <div className="min-h-screen flex" style={{fontFamily: "'Inter', sans-serif"}}>
+        <div className={`min-h-screen flex ${styles.bg}`} style={{fontFamily: "'Inter', sans-serif"}}>
+            {/* Mobile Sidebar Overlay */}
+            {sidebarOpen && (
+                <div
+                    className={`fixed inset-0 z-50 lg:hidden ${theme === 'dark' ? 'bg-black/50' : 'bg-black/30'}`}
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
 
-            {/* Sidebar */}
-            <aside className="w-56 min-h-screen bg-white border-r border-gray-100 flex flex-col fixed top-0 left-0">
-                <div className="px-5 py-5 border-b border-gray-100">
-                    <Link href={route('home')} className="text-xl font-black tracking-widest text-gray-900">VESTO</Link>
-                </div>
+            {/* Mobile Sidebar */}
+            <div className={`fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 lg:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <AccountSidebar activeMenu="wishlist" />
+            </div>
 
-                <div className="flex-1 px-3 py-4">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-3">Account</p>
-                    <nav className="flex flex-col gap-1">
-                        <Link href={route('buyer.dashboard')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                            Dashboard
-                        </Link>
-                        <Link href={route('buyer.orders')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 11H4L5 9z"/></svg>
-                            My Orders
-                        </Link>
-                        <Link href={route('buyer.wishlist')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-100 text-gray-900 text-sm font-bold">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                            Wishlist
-                        </Link>
-                        <Link href={route('buyer.addresses')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            Addresses
-                        </Link>
-                        <Link href={route('buyer.reviews')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
-                            Reviews
-                        </Link>
-                        <Link href={route('buyer.profile')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            Profile
-                        </Link>
-                    </nav>
-
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-3 mt-6">Shop</p>
-                    <nav className="flex flex-col gap-1">
-                        <Link href={route('home')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            Shop Now
-                        </Link>
-                    </nav>
-                </div>
-
-                <div className="border-t border-gray-100 p-3">
-                    <div className="flex items-center gap-3 px-3 py-2 mb-1">
-                        <div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">
-                            {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
-                            <p className="text-xs text-gray-400 truncate">{user.email}</p>
-                        </div>
-                    </div>
-                    <Link href={route('logout')} method="post" as="button"
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 text-sm font-semibold transition-colors">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                        Logout
-                    </Link>
-                </div>
-            </aside>
+            {/* Desktop Sidebar */}
+            <div className="hidden lg:block">
+                <AccountSidebar activeMenu="wishlist" />
+            </div>
 
             {/* Main content */}
-            <div className="ml-56 flex-1 min-h-screen bg-gray-50">
-                <div className="px-10 py-10">
-
-                    <div className="mb-8">
-                        <span className="text-xs font-semibold tracking-widest text-gray-400 uppercase">My Account</span>
-                        <h1 className="text-4xl font-black text-gray-900 mt-1" style={{letterSpacing: '-0.02em'}}>
-                            Wishlist
-                        </h1>
-                        <p className="text-gray-500 text-sm mt-2">Items you've saved for later.</p>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-                            </svg>
+            <div className="flex-1 min-h-screen transition-all duration-300 lg:ml-72 ml-0">
+                {/* Top Header */}
+                <div className={`${styles.headerBg} border-b ${styles.border} px-4 md:px-6 py-4 sticky top-0 z-40`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => setSidebarOpen(!sidebarOpen)}
+                                className={`lg:hidden p-2 ${styles.hoverBg} rounded-lg transition-colors`}
+                            >
+                                {sidebarOpen ? <X className={`w-5 h-5 ${styles.text}`} /> : <Menu className={`w-5 h-5 ${styles.text}`} />}
+                            </button>
+                            <div>
+                                <h1 className={`text-lg md:text-xl font-bold ${styles.text}`}>
+                                    Wishlist
+                                </h1>
+                                <p className={`text-xs md:text-sm ${styles.textMuted} mt-0.5 hidden sm:block`}>
+                                    Your favorite products
+                                </p>
+                            </div>
                         </div>
-                        <p className="font-black text-gray-900 mb-1">Your wishlist is empty</p>
-                        <p className="text-sm text-gray-400 mb-6">Save items you love and come back to them later.</p>
-                        <Link href={route('home')} className="inline-block bg-gray-900 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors">
-                            Shop Now →
-                        </Link>
+                        <div className="flex items-center gap-2 md:gap-4">
+                            <button
+                                onClick={toggleTheme}
+                                className={`p-2 ${styles.hoverBg} rounded-lg transition-colors`}
+                                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            >
+                                {theme === 'dark' ? <Sun className={`w-5 h-5 ${styles.textMuted}`} /> : <Moon className={`w-5 h-5 ${styles.textMuted}`} />}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 md:p-8">
+                    {/* Page Header */}
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h1 className={`text-2xl font-medium ${styles.text} tracking-wide`}>Wishlist</h1>
+                            <p className={`text-sm ${styles.textMutedLight} mt-1`}>Produk favorit yang ingin kamu beli nanti.</p>
+                        </div>
+                        <div className="relative">
+                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.textMutedLight}`} size={16} />
+                            <input
+                                type="text"
+                                placeholder="Cari produk..."
+                                className={`w-64 ${styles.inputBg} ${styles.border} rounded-xl pl-10 pr-4 py-2.5 text-sm ${styles.text} placeholder-gray-400 focus:outline-none focus:border-violet-500/50 transition-colors`}
+                            />
+                        </div>
                     </div>
 
+                    {wishlistProducts.length === 0 ? (
+                        <>
+                            {/* Empty Wishlist Hero */}
+                            <div className={`bg-gradient-to-br from-violet-900/20 via-blue-900/10 to-transparent ${styles.border} rounded-2xl p-8 mb-6`}>
+                                <div className="flex items-center gap-8">
+                                    {/* Left: Illustration */}
+                                    <div className="flex-1 flex items-center justify-center">
+                                        <div className="relative">
+                                            <div className="w-48 h-48 bg-gradient-to-br from-violet-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
+                                                <ShoppingBag size={64} className="text-violet-400" />
+                                            </div>
+                                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-gradient-to-br from-pink-500/30 to-red-500/30 rounded-full flex items-center justify-center">
+                                                <Heart size={24} className="text-pink-400 fill-pink-400" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Content */}
+                                    <div className="flex-1">
+                                        <h2 className={`text-2xl font-medium ${styles.text} mb-2`}>Wishlist kamu kosong</h2>
+                                        <p className={`${styles.textMuted} mb-6`}>Simpan produk yang kamu suka dan temukan nanti di sini.</p>
+                                        <Link
+                                            href="/shop"
+                                            className="inline-flex items-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white text-sm font-medium px-6 py-3 rounded-xl transition-all duration-300"
+                                        >
+                                            Mulai Belanja →
+                                        </Link>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Wishlist Toolbar */}
+                            <div className="flex items-center justify-between mb-6">
+                                <p className={`${styles.textMuted} text-sm`}>0 Produk di Wishlist</p>
+                                <div className="flex items-center gap-3">
+                                    <button className={`px-4 py-2 text-sm ${styles.textMuted} ${styles.border} rounded-lg ${styles.hoverBg} hover:${styles.textMutedLight} transition-colors disabled:opacity-50`} disabled>
+                                        Pilih Semua
+                                    </button>
+                                    <button className={`px-4 py-2 text-sm ${styles.textMuted} ${styles.border} rounded-lg ${styles.hoverBg} hover:${styles.textMutedLight} transition-colors disabled:opacity-50`} disabled>
+                                        Hapus (0)
+                                    </button>
+                                    <button className={`flex items-center gap-2 px-4 py-2 text-sm ${styles.textMuted} ${styles.border} rounded-lg ${styles.hoverBg} hover:${styles.textMutedLight} transition-colors disabled:opacity-50`} disabled>
+                                        Urutkan: Terbaru <ChevronDown size={14} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Empty Product Area */}
+                            <div className={`${styles.cardBg} ${styles.border} rounded-2xl p-12 mb-8`}>
+                                <div className="text-center">
+                                    <div className={`w-20 h-20 ${styles.cardBgLight} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                                        <Heart size={32} className={theme === 'dark' ? 'text-white/30' : 'text-gray-400'} />
+                                    </div>
+                                    <h3 className={`text-lg font-medium ${styles.text} mb-2`}>Wishlist kamu masih kosong</h3>
+                                    <p className={`${styles.textMuted} text-sm mb-6`}>Tambahkan produk favoritmu ke wishlist agar tidak ketinggalan.</p>
+                                    <Link
+                                        href="/shop"
+                                        className={`inline-flex items-center gap-2 ${styles.cardBgLight} hover:${styles.hoverBg} ${styles.text} text-sm font-medium px-6 py-3 rounded-xl transition-all duration-300`}
+                                    >
+                                        Mulai Belanja →
+                                    </Link>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Wishlist Toolbar */}
+                            <div className="flex items-center justify-between mb-6">
+                                <p className={`${styles.textMuted} text-sm`}>{wishlistProducts.length} Produk di Wishlist</p>
+                                <div className="flex items-center gap-3">
+                                    <button className={`px-4 py-2 text-sm ${styles.textMutedLight} ${styles.border} rounded-lg ${styles.hoverBg} hover:${styles.text} transition-colors`}>
+                                        Pilih Semua
+                                    </button>
+                                    <button className={`px-4 py-2 text-sm ${styles.textMutedLight} ${styles.border} rounded-lg ${styles.hoverBg} hover:${styles.text} transition-colors`}>
+                                        Hapus (0)
+                                    </button>
+                                    <button className={`flex items-center gap-2 px-4 py-2 text-sm ${styles.textMutedLight} ${styles.border} rounded-lg ${styles.hoverBg} hover:${styles.text} transition-colors`}>
+                                        Urutkan: Terbaru <ChevronDown size={14} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Product Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                {wishlistProducts.map((product) => (
+                                    <div key={product.id} className={`${styles.cardBg} ${styles.border} rounded-2xl overflow-hidden ${styles.hoverBg} transition-all duration-300 group`}>
+                                        {/* Product Image */}
+                                        <div className={`relative aspect-[3/4] ${styles.cardBgLight} overflow-hidden`}>
+                                            <img
+                                                src={product.image || 'https://via.placeholder.com/300x400'}
+                                                alt={product.name}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            />
+                                            {/* Wishlist Heart Button */}
+                                            <button className="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors">
+                                                <Heart size={16} className="text-red-500 fill-red-500" />
+                                            </button>
+                                            {/* Discount Badge */}
+                                            {product.discount && (
+                                                <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-medium px-2 py-1 rounded">
+                                                    -{product.discount}%
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Product Info */}
+                                        <div className="p-4">
+                                            <h3 className={`${styles.text} font-medium text-sm mb-2 line-clamp-2`}>{product.name}</h3>
+
+                                            {/* Rating */}
+                                            <div className="flex items-center gap-1 mb-2">
+                                                <div className="flex items-center">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <Star
+                                                            key={i}
+                                                            size={12}
+                                                            className={i < (product.rating || 4) ? 'text-yellow-400 fill-yellow-400' : (theme === 'dark' ? 'text-white/20' : 'text-gray-300')}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <span className={`${styles.textMutedLight} text-xs`}>({product.reviews || 0})</span>
+                                            </div>
+
+                                            {/* Price */}
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <p className={`${styles.text} font-medium`}>
+                                                    Rp {(product.price || 0).toLocaleString('id-ID')}
+                                                </p>
+                                                {product.original_price && (
+                                                    <p className={`${styles.textMutedLight} text-sm line-through`}>
+                                                        Rp {product.original_price.toLocaleString('id-ID')}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Add to Cart Button */}
+                                            <button className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all duration-300">
+                                                <ShoppingCart size={16} />
+                                                Tambah ke Keranjang
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Bottom Benefits Strip */}
+                    <div className={`${styles.cardBg} ${styles.border} rounded-2xl p-6`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 bg-violet-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <Heart size={18} className="text-violet-400" />
+                                </div>
+                                <div>
+                                    <p className={`${styles.text} font-medium text-sm mb-1`}>Simpan Favorit</p>
+                                    <p className={`${styles.textMuted} text-xs`}>Simpan produk yang kamu suka.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <Bell size={18} className="text-blue-400" />
+                                </div>
+                                <div>
+                                    <p className={`${styles.text} font-medium text-sm mb-1`}>Dapatkan Notifikasi</p>
+                                    <p className={`${styles.textMuted} text-xs`}>Dapatkan informasi saat harga turun.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 bg-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <Tag size={18} className="text-pink-400" />
+                                </div>
+                                <div>
+                                    <p className={`${styles.text} font-medium text-sm mb-1`}>Jangan Kehabisan</p>
+                                    <p className={`${styles.textMuted} text-xs`}>Notifikasi saat stok hampir habis.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <ShoppingBag size={18} className="text-green-400" />
+                                </div>
+                                <div>
+                                    <p className={`${styles.text} font-medium text-sm mb-1`}>Belanja Lebih Mudah</p>
+                                    <p className={`${styles.textMuted} text-xs`}>Temukan kembali produk favoritmu.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

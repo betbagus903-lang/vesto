@@ -14,10 +14,23 @@ class Collection extends Model
         'type',
         'is_active',
         'sort_order',
+        'layout_type',
+        'content',
+        'background_color',
+        'start_date',
+        'end_date',
+        'cover_image',
+        'badge',
+        'color_theme',
+        'visibility',
+        'publish_status',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'content' => 'array',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
     ];
 
     public function rules(): HasMany

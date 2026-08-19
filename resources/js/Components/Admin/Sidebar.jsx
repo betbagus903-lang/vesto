@@ -6,18 +6,12 @@ import {
   ClipboardList,
   ShoppingCart,
   Users,
-  Building2,
-  UserCog,
-  DollarSign,
   BarChart3,
   Megaphone,
-  Bell,
   MessageSquare,
-  Calendar,
   FileText,
   Settings,
   Shield,
-  ScrollText,
   HelpCircle,
   ChevronRight,
   ChevronLeft,
@@ -61,26 +55,14 @@ const menuItems = [
       { name: 'GDPR Data Requests',  href: '/admin/customers/gdpr-data-requests' },
     ],
   },
-  { name: 'Suppliers', icon: Building2, href: '/admin/suppliers' },
-  { name: 'Employees', icon: UserCog, href: '/admin/employees' },
-  {
-    name: 'Finance',
-    icon: DollarSign,
-    hasSubmenu: true,
-    submenu: [
-      { name: 'Transactions', href: '/admin/finance/transactions' },
-      { name: 'Invoices', href: '/admin/finance/invoices' },
-      { name: 'Expenses', href: '/admin/finance/expenses' },
-    ],
-  },
   {
     name: 'Reports',
     icon: BarChart3,
     hasSubmenu: true,
     submenu: [
       { name: 'Sales Report', href: '/admin/reports/sales' },
-      { name: 'Inventory Report', href: '/admin/reports/inventory' },
       { name: 'Customer Report', href: '/admin/reports/customers' },
+      { name: 'Product Report', href: '/admin/reports/products' },
     ],
   },
   {
@@ -93,9 +75,7 @@ const menuItems = [
       { name: 'SEO', href: '/admin/marketing/seo' },
     ],
   },
-  { name: 'Notifications', icon: Bell, href: '/admin/notifications' },
   { name: 'Messages', icon: MessageSquare, href: '/admin/messages' },
-  { name: 'Calendar', icon: Calendar, href: '/admin/calendar' },
   {
     name: 'CMS',
     icon: FileText,
@@ -111,16 +91,9 @@ const menuItems = [
   {
     name: 'Settings',
     icon: Settings,
-    hasSubmenu: true,
-    submenu: [
-      { name: 'General', href: '/admin/settings/general' },
-      { name: 'Security', href: '/admin/settings/security' },
-      { name: 'Email', href: '/admin/settings/email' },
-    ],
+    href: '/admin/settings',
   },
   { name: 'User Management', icon: Shield, href: '/admin/users' },
-  { name: 'Roles & Permissions', icon: ScrollText, href: '/admin/roles' },
-  { name: 'Activity Logs', icon: FileText, href: '/admin/activity-logs' },
   { name: 'Help Center', icon: HelpCircle, href: '/admin/help' },
 ];
 
@@ -165,23 +138,47 @@ export default function Sidebar({
     if (activePath.includes('/marketing')) {
       setExpandedMenus((prev) => ({ ...prev, Marketing: true }));
     }
+    if (activePath.includes('/reports')) {
+      setExpandedMenus((prev) => ({ ...prev, Reports: true }));
+    }
   }, [activePath]);
 
   const sidebarWidth = isCollapsed ? 'w-20' : 'w-[280px]';
 
+  const themeStyles = {
+    dark: {
+      bg: 'bg-[#0F172A]',
+      border: 'border-white/5',
+      text: 'text-white',
+      textMuted: 'text-gray-400',
+      hoverBg: 'hover:bg-white/5',
+      activeBg: 'bg-gradient-to-r from-[#4F6BFF] to-[#6366F1]',
+    },
+    light: {
+      bg: 'bg-white',
+      border: 'border-gray-200',
+      text: 'text-gray-900',
+      textMuted: 'text-gray-500',
+      hoverBg: 'hover:bg-gray-100',
+      activeBg: 'bg-gradient-to-r from-[#4F6BFF] to-[#6366F1]',
+    },
+  };
+
+  const styles = themeStyles[theme];
+
   return (
     <>
       <aside
-        className={`fixed left-0 top-0 h-full z-50 transition-all duration-300 ease-in-out ${sidebarWidth} bg-[#0F172A]`}
+        className={`fixed left-0 top-0 h-full z-50 transition-all duration-300 ease-in-out ${sidebarWidth} ${styles.bg} ${theme === 'dark' ? '' : 'border-r border-gray-200'}`}
       >
         {/* Logo Section */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
+        <div className={`h-16 flex items-center justify-between px-6 ${styles.border}`}>
           {!isCollapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#4F6BFF] to-[#6366F1] flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-[#4F6BFF]/30">
                 V
               </div>
-              <span className="font-bold text-lg text-white tracking-tight">Vesto</span>
+              <span className={`font-bold text-lg tracking-tight ${styles.text}`}>Vesto</span>
             </div>
           ) : (
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#4F6BFF] to-[#6366F1] flex items-center justify-center text-white font-bold text-sm mx-auto shadow-lg shadow-[#4F6BFF]/30">
@@ -190,7 +187,7 @@ export default function Sidebar({
           )}
           <button
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg transition hover:bg-white/5 text-gray-400 hover:text-white"
+            className={`p-1.5 rounded-lg transition ${styles.hoverBg} ${styles.textMuted} hover:${styles.text}`}
           >
             {!isCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
@@ -206,8 +203,8 @@ export default function Sidebar({
                     href={item.href}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                       activePath === item.href
-                        ? 'bg-gradient-to-r from-[#4F6BFF] to-[#6366F1] text-white shadow-lg shadow-[#4F6BFF]/25'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        ? `${styles.activeBg} text-white shadow-lg shadow-[#4F6BFF]/25`
+                        : `${styles.textMuted} ${styles.hoverBg} hover:${styles.text}`
                     }`}
                   >
                     <item.icon className="w-4.5 h-4.5 flex-shrink-0" />
@@ -219,8 +216,8 @@ export default function Sidebar({
                       onClick={() => toggleMenu(item.name)}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${
                         expandedMenus[item.name]
-                          ? 'bg-white/5 text-white'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                          ? `${styles.hoverBg} ${styles.text}`
+                          : `${styles.textMuted} ${styles.hoverBg} hover:${styles.text}`
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -243,8 +240,8 @@ export default function Sidebar({
                               href={subItem.href}
                               className={`block px-3 py-2 rounded-lg transition-all duration-200 text-sm border-l-2 ${
                                 activePath === subItem.href
-                                  ? 'text-white bg-gradient-to-r from-[#4F6BFF]/20 to-[#6366F1]/20 border-[#4F6BFF]'
-                                  : 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+                                  ? `${styles.text} bg-gradient-to-r from-[#4F6BFF]/20 to-[#6366F1]/20 border-[#4F6BFF]`
+                                  : `${styles.textMuted} ${styles.hoverBg} hover:${styles.text} border-transparent`
                               }`}
                             >
                               {subItem.name}
@@ -261,15 +258,15 @@ export default function Sidebar({
         </nav>
 
         {/* User Profile Section */}
-        <div className="p-4 border-t border-white/5">
+        <div className={`p-4 ${styles.border}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4F6BFF] to-[#6366F1] flex items-center justify-center text-white font-semibold text-sm shadow-lg shadow-[#4F6BFF]/30">
               A
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">Admin User</p>
-                <p className="text-xs text-gray-400 truncate">admin@vesto.com</p>
+                <p className={`text-sm font-semibold ${styles.text} truncate`}>Admin User</p>
+                <p className={`text-xs ${styles.textMuted} truncate`}>admin@vesto.com</p>
               </div>
             )}
           </div>

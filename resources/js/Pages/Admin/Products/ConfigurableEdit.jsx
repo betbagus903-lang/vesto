@@ -7,11 +7,14 @@ import AdminLayout from "../../../Components/Admin/AdminLayout";
 import RichTextEditor from "../../../Components/Admin/RichTextEditor";
 import EditVariantModal from "../../../Components/Admin/EditVariantModal";
 import CategoryMultiSelectTree from "../../../Components/Admin/CategoryMultiSelectTree";
+import ConfigurableAttributesModal from "../../../Components/Admin/ProductForms/ConfigurableAttributesModal";
+import { removeBackground } from '@imgly/background-removal';
 import {
     Save, X, Plus, Trash2,
     ChevronDown, ChevronRight,
     Search, Upload, Video,
     PlusCircle, Zap, RefreshCw,
+    Wand2, Loader2,
 } from "lucide-react";
 
 /* ─── shared input style ──────────────────────────────────────── */
@@ -193,6 +196,8 @@ export default function ConfigurableEditProduct({
         guest_checkout:     product.guest_checkout !== undefined ? product.guest_checkout : true,
         allow_rma:          !!product.allow_rma,
         rma_rules:          product.rma_rules          || "",
+        enable_variant_background: product.enable_variant_background ?? false,
+        custom_background_color: product.custom_background_color || "#ffffff",
         category_ids:       product.categories?.map(c => c.id)           || [],
         images:             parseImages(product.images),
         videos:             product.videos                                || [],
@@ -203,6 +208,8 @@ export default function ConfigurableEditProduct({
         new_images: [],
         sub_category_id: product.sub_category_id || "",
     });
+
+    const [removingBackground, setRemovingBackground] = useState(null);
 
 
 
@@ -230,10 +237,6 @@ export default function ConfigurableEditProduct({
 
     /* ── configurable product state ─────────────────────────── */
     const [showConfigModal, setShowConfigModal] = useState(false);
-    const [selectedConfigAttrs, setSelectedConfigAttrs] = useState(
-        typeSpecificData?.configurable_attributes || []
-    );
-    const [selectedOptions, setSelectedOptions] = useState({});
     const [showEditVariantModal, setShowEditVariantModal] = useState(false);
     const [editingVariant, setEditingVariant] = useState(null);
     
@@ -263,20 +266,6 @@ export default function ConfigurableEditProduct({
         });
         return result;
     })();
-
-    const handleGenerateVariants = async () => {
-        if (selectedConfigAttrs.length === 0) return;
-        const csrf = document.querySelector('meta[name=csrf-token]')?.content ?? '';
-        const res = await fetch(`/admin/products/${product.id}/configure-attributes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-            body: JSON.stringify({ configurable_attributes: selectedConfigAttrs }),
-        });
-        if (res.ok) {
-            setShowConfigModal(false);
-            window.location.reload();
-        }
-    };
 
     // Bulk selection handlers
     const handleSelectVariant = (variantId) => {
@@ -414,6 +403,43 @@ export default function ConfigurableEditProduct({
             setFormData(p => ({ ...p, images: p.images.filter((_, i) => i !== index) }));
         else
             setFormData(p => ({ ...p, new_images: p.new_images.filter((_, i) => i !== index) }));
+    };
+
+    const handleRemoveBackground = async (type, index) => {
+        const imageKey = `${type}-${index}`;
+        setRemovingBackground(imageKey);
+
+        try {
+            let imageUrl;
+            let imageFile;
+
+            if (type === "old") {
+                imageUrl = `/storage/${formData.images[index]}`;
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                imageFile = new File([blob], "image.jpg", { type: blob.type });
+            } else {
+                imageFile = formData.new_images[index];
+            }
+
+            const blob = await removeBackground(imageFile);
+            const newFile = new File([blob], `no-bg-${imageFile.name}`, { type: blob.type });
+
+            if (type === "old") {
+                const newImages = [...formData.images];
+                newImages[index] = URL.createObjectURL(newFile);
+                setFormData(p => ({ ...p, images: newImages }));
+            } else {
+                const newImages = [...formData.new_images];
+                newImages[index] = newFile;
+                setFormData(p => ({ ...p, new_images: newImages }));
+            }
+        } catch (error) {
+            console.error('Background removal failed:', error);
+            alert('Failed to remove background. Please try again.');
+        } finally {
+            setRemovingBackground(null);
+        }
     };
 
     /* ── product relation search ─────────────────────────────── */
@@ -693,14 +719,27 @@ export default function ConfigurableEditProduct({
                                     </div>
                                     <span style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>Add Image</span>
                                 </div>
+                                <div className="flex flex-col items-center cursor-pointer" onClick={() => window.open(`/admin/products/design/${product.id}/image/new`, '_blank')}>
+                                    <div style={{ width: 80, height: 80, borderRadius: 8, border: "2px solid #3B82F6", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#3B82F6" }}>
+                                        <Wand2 size={20} style={{ color: "#fff" }} />
+                                    </div>
+                                    <span style={{ fontSize: 11, color: "#3B82F6", marginTop: 6 }}>Design New</span>
+                                </div>
                                 {formData.images.map((img, i) => (
                                     <div key={`old-${i}`} className="flex flex-col items-center relative group">
                                         <button type="button" onClick={() => removeImage("old", i)}
                                             className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <X size={10} style={{ color: "#fff" }} />
                                         </button>
+                                        {/* Edit Design button */}
+                                        <button type="button"
+                                            onClick={() => window.open(`/admin/products/design/${product.id}/image/${i}`, '_blank')}
+                                            className="absolute -top-2 -left-2 bg-blue-500 rounded-full p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title={`Edit Image ${i + 1} in Designer`}>
+                                            <Wand2 size={10} style={{ color: "#fff" }} />
+                                        </button>
                                         <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #2C3A4D" }}>
-                                            <img src={`/storage/${img}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                            <img src={img.startsWith('blob:') ? img : `/storage/${img}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                         </div>
                                         <span style={{ fontSize: 11, color: "#94A3B8", marginTop: 6 }}>Image {i + 1}</span>
                                     </div>
@@ -742,6 +781,30 @@ export default function ConfigurableEditProduct({
                                 
                                 {/* Top Toolbar */}
                                 <div style={{ marginBottom: '16px' }}>
+                                    {/* Configure Attributes Button */}
+                                    <div style={{ marginBottom: '12px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfigModal(true)}
+                                            style={{
+                                                padding: '10px 16px',
+                                                backgroundColor: '#3B82F6',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontSize: '13px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8
+                                            }}
+                                        >
+                                            <Plus size={14} />
+                                            Configure Attributes
+                                        </button>
+                                    </div>
+                                    
                                     {/* Search and Filters Row */}
                                     <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                                         {/* Search */}
@@ -1172,6 +1235,44 @@ export default function ConfigurableEditProduct({
                                 style={{ ...fld(), height: "auto", padding: "9px 12px", resize: "vertical" }} />
                         </div>
 
+                        {/* Variant Background */}
+                        <div style={card}>
+                            <h2 style={cardTitle}>Variant Background</h2>
+                            <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>Enable to change page background based on variant color</p>
+                            <div className="flex items-center justify-between mb-6">
+                                <span style={{ fontSize: 13, color: "#F8FAFC" }}>Enable Variant Background</span>
+                                <ToggleSwitch name="enable_variant_background" checked={!!formData.enable_variant_background} />
+                            </div>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontSize: 13, color: "#94A3B8", display: "block", marginBottom: 6 }}>Custom Background Color</label>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="color"
+                                        name="custom_background_color"
+                                        value={formData.custom_background_color}
+                                        onChange={handleChange}
+                                        style={{
+                                            width: "60px",
+                                            height: "44px",
+                                            border: "1px solid #1E293B",
+                                            borderRadius: "8px",
+                                            cursor: "pointer",
+                                            backgroundColor: "#0C1524",
+                                        }}
+                                    />
+                                    <input
+                                        type="text"
+                                        name="custom_background_color"
+                                        value={formData.custom_background_color}
+                                        onChange={handleChange}
+                                        placeholder="#ffffff"
+                                        style={inp()}
+                                    />
+                                </div>
+                                <p style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>Used when variant background is disabled</p>
+                            </div>
+                        </div>
+
                         {/* Categories */}
                         <div style={card}>
                             <h2 style={cardTitle}>Categories</h2>
@@ -1187,71 +1288,12 @@ export default function ConfigurableEditProduct({
 
                 {/* Configure Attributes Modal */}
                 {showConfigModal && (
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 50, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ backgroundColor: '#101827', border: '1px solid #1E293B', borderRadius: 12, width: '100%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
-                            {/* Header */}
-                            <div style={{ padding: '20px 24px', borderBottom: '1px solid #1E293B', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div>
-                                    <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC' }}>Configure Attributes</h3>
-                                    <p style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Pilih attribute untuk membuat kombinasi variant</p>
-                                </div>
-                                <button type="button" onClick={() => setShowConfigModal(false)} style={{ color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                    <X size={18} />
-                                </button>
-                            </div>
-
-                            {/* Body */}
-                            <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-                                {configurableAttributeOptions.length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748B' }}>
-                                        <p style={{ fontSize: 14, marginBottom: 8 }}>Tidak ada attribute yang tersedia.</p>
-                                        <p style={{ fontSize: 12 }}>Pastikan Attribute Family memiliki attribute bertipe <strong>select</strong> atau <strong>multiselect</strong>.</p>
-                                    </div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                        {configurableAttributeOptions.map(attr => (
-                                            <label key={attr.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', border: `1px solid ${selectedConfigAttrs.includes(attr.id) ? '#3B82F6' : '#1E293B'}`, borderRadius: 8, cursor: 'pointer', backgroundColor: selectedConfigAttrs.includes(attr.id) ? '#0F1E35' : 'transparent' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedConfigAttrs.includes(attr.id)}
-                                                    onChange={() => setSelectedConfigAttrs(prev =>
-                                                        prev.includes(attr.id) ? prev.filter(id => id !== attr.id) : [...prev, attr.id]
-                                                    )}
-                                                    style={{ marginTop: 2, accentColor: '#3B82F6', width: 16, height: 16, flexShrink: 0 }}
-                                                />
-                                                <div style={{ flex: 1 }}>
-                                                    <p style={{ fontSize: 14, fontWeight: 600, color: '#F8FAFC', marginBottom: 4 }}>{attr.admin_name}</p>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                        {(attr.options || []).map(opt => (
-                                                            <span key={opt.id} style={{ fontSize: 11, backgroundColor: '#1E293B', color: '#94A3B8', padding: '2px 8px', borderRadius: 4 }}>
-                                                                {opt.admin_name}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Footer */}
-                            <div style={{ padding: '16px 24px', borderTop: '1px solid #1E293B', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                                <button type="button" onClick={() => setShowConfigModal(false)}
-                                    style={{ padding: '8px 16px', border: '1px solid #1E293B', borderRadius: 8, color: '#94A3B8', backgroundColor: 'transparent', cursor: 'pointer', fontSize: 13 }}>
-                                    Batal
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleGenerateVariants}
-                                    disabled={selectedConfigAttrs.length === 0}
-                                    className="flex items-center gap-2"
-                                    style={{ padding: '8px 16px', backgroundColor: selectedConfigAttrs.length === 0 ? '#374151' : '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, cursor: selectedConfigAttrs.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
-                                    <Save size={14} /> Save & Generate Variants
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <ConfigurableAttributesModal
+                        product={product}
+                        attributeFamily={attributeFamily}
+                        onClose={() => setShowConfigModal(false)}
+                        onSuccess={() => window.location.reload()}
+                    />
                 )}
 
                 {/* Product Search Modal */}
@@ -1301,6 +1343,8 @@ export default function ConfigurableEditProduct({
                 {showEditVariantModal && editingVariant && (
                     <EditVariantModal
                         variant={editingVariant}
+                        productId={product.id}
+                        allVariants={typeSpecificData?.variants || []}
                         onClose={() => {
                             setShowEditVariantModal(false);
                             setEditingVariant(null);

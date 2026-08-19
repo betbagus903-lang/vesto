@@ -8,6 +8,8 @@ use App\Models\OrderItem;
 use App\Models\OrderAddress;
 use App\Models\ProductVariant;
 use App\Models\User;
+use App\Models\Coupon;
+use App\Models\UserCoupon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -40,6 +42,7 @@ class OrderController extends Controller
             'subtotal' => 'required|numeric|min:0',
             'shippingCost' => 'required|numeric|min:0',
             'total' => 'required|numeric|min:0',
+            'couponCode' => 'nullable|string',
         ]);
 
         \Log::info('Place Order - Validation passed');
@@ -53,7 +56,62 @@ class OrderController extends Controller
                 'cartItems_count' => count($validated['cartItems']),
                 'subtotal' => $validated['subtotal'],
                 'total' => $validated['total'],
+                'couponCode' => $validated['couponCode'] ?? null,
             ]);
+
+            // Handle coupon usage
+            $coupon = null;
+            $discount = 0;
+            if (!empty($validated['couponCode'])) {
+                $coupon = Coupon::where('code', strtoupper(trim($validated['couponCode'])))->first();
+                
+                if ($coupon) {
+                    // Validate coupon again before using
+                    if (!$coupon->is_active) {
+                        return back()->with('error', 'This coupon is not active');
+                    }
+                    
+                    if ($coupon->expire_date && now()->gt($coupon->expire_date)) {
+                        return back()->with('error', 'This coupon has expired');
+                    }
+                    
+                    if ($coupon->start_date && now()->lt($coupon->start_date)) {
+                        return back()->with('error', 'This coupon is not yet active');
+                    }
+                    
+                    // Check if user already used this coupon
+                    $userCoupon = UserCoupon::where('user_id', auth()->id())
+                        ->where('coupon_id', $coupon->id)
+                        ->first();
+                    
+                    if ($userCoupon && $userCoupon->is_used) {
+                        return back()->with('error', 'You have already used this coupon');
+                    }
+                    
+                    // Calculate discount
+                    switch ($coupon->discount_type) {
+                        case 'percentage':
+                            $discount = ($validated['subtotal'] * $coupon->discount_value) / 100;
+                            break;
+                        case 'fixed':
+                            $discount = $coupon->discount_value;
+                            break;
+                        case 'free_shipping':
+                            $discount = 0; // Handled separately
+                            break;
+                    }
+                    
+                    // Apply maximum discount limit if set
+                    if ($coupon->maximum_discount && $discount > $coupon->maximum_discount) {
+                        $discount = $coupon->maximum_discount;
+                    }
+                    
+                    // Ensure discount doesn't exceed subtotal
+                    if ($discount > $validated['subtotal']) {
+                        $discount = $validated['subtotal'];
+                    }
+                }
+            }
 
             // Create billing address
             $billingAddress = OrderAddress::create([
@@ -97,13 +155,14 @@ class OrderController extends Controller
                 'subtotal' => $validated['subtotal'],
                 'tax' => 0,
                 'shipping_amount' => $validated['shippingCost'],
-                'discount' => 0,
+                'discount' => $discount,
                 'grand_total' => $validated['total'],
                 'payment_status' => 'pending',
                 'payment_method' => $validated['paymentMethod'],
                 'shipping_method' => $validated['shippingMethod'],
                 'shipping_cost' => $validated['shippingCost'],
                 'billing_address_id' => $billingAddress->id,
+                'coupon_code' => $coupon ? $coupon->code : null,
             ]);
 
             \Log::info('Order created', ['order_id' => $order->id, 'order_number' => $order->order_number]);
@@ -121,6 +180,33 @@ class OrderController extends Controller
                     'price' => $item['price'],
                     'total' => $item['price'] * $item['quantity'],
                 ]);
+            }
+
+            // Mark coupon as used if coupon was applied
+            if ($coupon) {
+                // Find or create user coupon record
+                $userCoupon = UserCoupon::where('user_id', auth()->id())
+                    ->where('coupon_id', $coupon->id)
+                    ->first();
+                
+                if ($userCoupon) {
+                    // Mark as used
+                    $userCoupon->update([
+                        'is_used' => true,
+                        'used_at' => now(),
+                    ]);
+                } else {
+                    // Create new user coupon record and mark as used
+                    UserCoupon::create([
+                        'user_id' => auth()->id(),
+                        'coupon_id' => $coupon->id,
+                        'is_used' => true,
+                        'used_at' => now(),
+                    ]);
+                }
+                
+                // Increment coupon usage count
+                $coupon->increment('used_count');
             }
 
             DB::commit();

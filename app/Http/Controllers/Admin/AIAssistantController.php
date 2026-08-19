@@ -49,8 +49,27 @@ class AIAssistantController extends Controller
                 [['role' => 'user', 'content' => $message]]
             );
 
-            // Get available tools
-            $tools = $this->toolRegistry->toGeminiFormat();
+            // Check if message is a simple greeting or conversational (not requiring tools)
+            $conversationalPatterns = [
+                '/^hai/i', '/^halo/i', '/^hello/i', '/^hi/i', 
+                '/^how are you/i', '/^apa kabar/i', '/^bagaimana/i',
+                '/^terima kasih/i', '/^thanks/i', '/^thank you/i',
+                '/^siapa kamu/i', '/^who are you/i', '/^nama kamu/i',
+                '/^bisa cerita/i', '/^ceritakan/i', '/^tell me/i',
+                '/^apa/i', '/^what/i', '/^why/i', '/^how/i', '/^explain/i',
+                '/^help/i', '/^bantuan/i', '/^can you/i', '/^bisa kah/i'
+            ];
+            
+            $isConversational = false;
+            foreach ($conversationalPatterns as $pattern) {
+                if (preg_match($pattern, strtolower(trim($message)))) {
+                    $isConversational = true;
+                    break;
+                }
+            }
+
+            // Only include tools for non-conversational messages
+            $tools = $isConversational ? [] : $this->toolRegistry->toGeminiFormat();
 
             // Call Mistral
             $response = $this->mistral->generateContent($messages, $tools);
@@ -88,15 +107,15 @@ class AIAssistantController extends Controller
                 'session_id' => $sessionId,
             ]);
         } catch (\Exception $e) {
-            // Fallback to rule-based if Mistral fails
-            $response = $this->processCommand($message, $context);
-            $sessionId = $this->saveSession($sessionId, $history, $context['language'] ?? 'en');
+            Log::error('Mistral API Error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             
             return response()->json([
-                'type' => 'answer',
-                'response' => $response['response'],
-                'session_id' => $sessionId,
-            ]);
+                'type' => 'error',
+                'error' => 'AI Error: ' . $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -177,12 +196,25 @@ class AIAssistantController extends Controller
      */
     public function sessions()
     {
-        $userId = Auth::id();
-        $sessions = AIChatSession::where('user_id', $userId)
-            ->orderBy('updated_at', 'desc')
-            ->get(['id', 'title', 'messages', 'updated_at', 'is_active']);
+        try {
+            $userId = Auth::id();
+            if (!$userId) {
+                return response()->json([]);
+            }
+            
+            $sessions = AIChatSession::where('user_id', $userId)
+                ->orderBy('updated_at', 'desc')
+                ->get(['id', 'title', 'messages', 'updated_at', 'is_active']);
 
-        return response()->json($sessions);
+            return response()->json($sessions);
+        } catch (\Exception $e) {
+            Log::error('Sessions error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([]);
+        }
     }
 
     /**
@@ -753,14 +785,33 @@ class AIAssistantController extends Controller
      */
     public function suggestions(Request $request)
     {
-        $context = $request->input('context', []);
-        $context = $this->buildContext($context);
+        try {
+            $context = $request->input('context', []);
+            $context = $this->buildContext($context);
 
-        $suggestions = $this->getContextualSuggestions($context);
+            $suggestions = $this->getContextualSuggestions($context);
 
-        return response()->json([
-            'suggestions' => $suggestions,
-        ]);
+            return response()->json([
+                'suggestions' => $suggestions,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Suggestions error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Return default suggestions on error
+            return response()->json([
+                'suggestions' => [
+                    "Create a new product",
+                    "Show all orders",
+                    "Generate sales report",
+                    "Manage customers",
+                    "Create a campaign",
+                    "View system settings"
+                ]
+            ]);
+        }
     }
 
     /**
@@ -770,7 +821,7 @@ class AIAssistantController extends Controller
     {
         $defaultContext = [
             'current_page' => request()->path(),
-            'user_role' => Auth::user()?->role ?? 'guest',
+            'user_role' => Auth::check() ? (Auth::user()->role ?? 'admin') : 'guest',
             'timestamp' => now()->toIso8601String(),
         ];
 

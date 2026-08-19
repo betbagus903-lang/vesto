@@ -4,6 +4,8 @@ import { Menu, X, Grid3X3, List } from 'lucide-react';
 import SidebarFilter from '../Components/Shop/SidebarFilter';
 import ProductCard from '../Components/Shop/ProductCard';
 import Navbar from '../Components/Shared/Navbar';
+import BannerRenderer from '../Components/BannerRenderer';
+import { useTheme } from '../Context/ThemeContext';
 
 function fmt(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value ?? 0);
@@ -135,6 +137,7 @@ export default function Shop({
     heroBanners = []
 }) {
     const { auth } = usePage().props;
+    const { theme } = useTheme();
     const [search, setSearch] = useState(initSearch);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -144,6 +147,23 @@ export default function Shop({
     const [priceMax, setPriceMax] = useState(initPriceMax);
     const [selectedColors, setSelectedColors] = useState(initColors);
     const timer = useRef(null);
+
+    // Theme colors
+    const currentTheme = theme === 'dark' ? {
+        background: '#0A0D14',
+        card: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+    } : {
+        background: '#FFFFFF',
+        card: '#F8F9FA',
+        border: 'rgba(0,0,0,0.1)',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+    };
 
     // Sync state dengan props dari Inertia (pagination, sort, search, refresh)
     useEffect(() => { setSelectedColors(initColors); }, [initColors.join(',')]);
@@ -167,7 +187,7 @@ export default function Shop({
         const clean = Object.fromEntries(
             Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
         );
-        router.get('/shop', clean, { preserveState: false, preserveScroll: false });
+        router.get('/shop', clean, { preserveState: true, preserveScroll: true });
     };
 
     const handleSearch = (val) => {
@@ -215,14 +235,14 @@ export default function Shop({
     };
 
     return (
-        <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="min-h-screen" style={{ backgroundColor: currentTheme.background, fontFamily: "'Inter', sans-serif" }}>
             {/* Top Bar */}
-            <div className="bg-gray-900 text-white text-center py-2.5 text-xs tracking-widest font-medium">
+            <div className={`${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'} text-center py-2.5 text-xs tracking-widest font-medium`}>
                 FREE SHIPPING ON ORDERS ABOVE RP200.000 &nbsp;·&nbsp; NEW COLLECTION 2026
             </div>
 
             {/* Navbar */}
-            <Navbar categories={categories} />
+            <Navbar categories={categories} darkMode={theme === 'dark'} />
 
             {/* Category Hero Banner */}
             {(() => {
@@ -230,6 +250,16 @@ export default function Shop({
                 const cmsBanner = categoryBanners.length > 0 ? categoryBanners[0] : null;
                 const fallbackBanner = CATEGORY_BANNERS[activeCategory] || CATEGORY_BANNERS[''];
                 
+                // If CMS banner has layout_json, use BannerRenderer
+                if (cmsBanner && cmsBanner.layout_json) {
+                    return (
+                        <section className="relative overflow-hidden">
+                            <BannerRenderer layoutJson={cmsBanner.layout_json} />
+                        </section>
+                    );
+                }
+                
+                // Otherwise use traditional CMS banner or fallback
                 if (cmsBanner) {
                     return (
                         <section className="relative overflow-hidden">
@@ -242,13 +272,13 @@ export default function Shop({
                                     onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                             )}
-                            {/* Dark overlay biar text kebaca */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
-                            <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-18 md:py-24 min-h-[220px] sm:min-h-[280px] md:min-h-[340px] flex items-center">
+                            <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:8 py-14 sm:py-18 md:py-24 min-h-[220px] sm:min-h-[280px] md:min-h-[340px] flex items-center">
                                 <div className="text-center md:text-left">
-                                    <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.3em] text-gray-300 mb-2 sm:mb-3">
-                                        {cmsBanner.subtitle || 'Featured Collection'}
-                                    </p>
+                                    {cmsBanner.subtitle && (
+                                        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.3em] text-gray-300 mb-2 sm:mb-3">
+                                            {cmsBanner.subtitle}
+                                        </p>
+                                    )}
                                     <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none drop-shadow-lg">
                                         {cmsBanner.title}
                                     </h1>
@@ -329,18 +359,43 @@ export default function Shop({
                             activeColors={selectedColors}
                             onFilterChange={handleFilterChange}
                             onClearAll={handleClearAll}
+                            theme={theme}
                         />
                     </div>
 
                     {/* Products Area */}
                     <div className="flex-1">
                         {/* Toolbar */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-200">
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4" style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
+                            {/* Mobile Filter Button */}
+                            <button
+                                onClick={() => setSidebarOpen(true)}
+                                className="lg:hidden flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors"
+                                style={{ 
+                                    backgroundColor: currentTheme.card, 
+                                    borderColor: currentTheme.border,
+                                    color: currentTheme.white
+                                }}
+                            >
+                                <Menu className="w-4 h-4" />
+                                Filters
+                                {selectedColors.length > 0 && (
+                                    <span className="ml-1 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: '#4F6BFF', color: '#FFFFFF' }}>
+                                        {selectedColors.length}
+                                    </span>
+                                )}
+                            </button>
+
                             {/* Sort */}
                             <select
                                 value={sort}
                                 onChange={e => handleSort(e.target.value)}
-                                className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400 bg-white"
+                                className="px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-gray-400"
+                                style={{ 
+                                    backgroundColor: currentTheme.card, 
+                                    borderColor: currentTheme.border,
+                                    color: currentTheme.white
+                                }}
                             >
                                 <option value="latest">Latest</option>
                                 <option value="price_asc">Price Low to High</option>
@@ -354,7 +409,12 @@ export default function Shop({
                                 <select
                                     value={perPage}
                                     onChange={e => handlePerPage(Number(e.target.value))}
-                                    className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400 bg-white"
+                                    className="hidden md:block px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:border-gray-400"
+                                    style={{ 
+                                        backgroundColor: currentTheme.card, 
+                                        borderColor: currentTheme.border,
+                                        color: currentTheme.white
+                                    }}
                                 >
                                     <option value={10}>10</option>
                                     <option value={24}>24</option>
@@ -362,16 +422,18 @@ export default function Shop({
                                 </select>
 
                                 {/* View Toggle */}
-                                <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden">
+                                <div className="hidden md:flex items-center gap-1 rounded-lg overflow-hidden" style={{ border: `1px solid ${currentTheme.border}` }}>
                                     <button
                                         onClick={() => setViewMode('grid')}
                                         className={`p-2.5 ${viewMode === 'grid' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                                        style={{ backgroundColor: viewMode === 'grid' ? '#111827' : currentTheme.card, color: viewMode === 'grid' ? '#FFFFFF' : currentTheme.secondaryText }}
                                     >
                                         <Grid3X3 className="w-4 h-4" />
                                     </button>
                                     <button
                                         onClick={() => setViewMode('list')}
                                         className={`p-2.5 ${viewMode === 'list' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                                        style={{ backgroundColor: viewMode === 'list' ? '#111827' : currentTheme.card, color: viewMode === 'list' ? '#FFFFFF' : currentTheme.secondaryText }}
                                     >
                                         <List className="w-4 h-4" />
                                     </button>
@@ -382,7 +444,7 @@ export default function Shop({
                         {/* Products Grid */}
                         <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1'}`}>
                             {products.map(product => (
-                                <ProductCard key={product.id} product={product} selectedColor={selectedColors.length > 0 ? selectedColors[0] : null} selectedColors={selectedColors} />
+                                <ProductCard key={product.id} product={product} selectedColor={selectedColors.length > 0 ? selectedColors[0] : null} selectedColors={selectedColors} theme={theme} />
                             ))}
                         </div>
 
@@ -392,7 +454,12 @@ export default function Shop({
                                 <button
                                     onClick={() => handlePageChange(pagination.current_page - 1)}
                                     disabled={pagination.current_page <= 1}
-                                    className="w-10 h-10 rounded-full border border-gray-200 text-sm font-medium disabled:opacity-40 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                                    className="w-10 h-10 rounded-full text-sm font-medium disabled:opacity-40 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                                    style={{ 
+                                        border: `1px solid ${currentTheme.border}`,
+                                        backgroundColor: currentTheme.card,
+                                        color: currentTheme.white
+                                    }}
                                 >
                                     ←
                                 </button>
@@ -411,11 +478,12 @@ export default function Shop({
                                         <button
                                             key={pageNum}
                                             onClick={() => handlePageChange(pageNum)}
-                                            className={`w-10 h-10 rounded-full text-sm font-medium transition-colors flex items-center justify-center ${
-                                                pagination.current_page === pageNum
-                                                    ? 'bg-gray-900 text-white'
-                                                    : 'border border-gray-200 hover:bg-gray-50'
-                                            }`}
+                                            className="w-10 h-10 rounded-full text-sm font-medium transition-colors flex items-center justify-center"
+                                            style={{
+                                                backgroundColor: pagination.current_page === pageNum ? '#111827' : currentTheme.card,
+                                                color: pagination.current_page === pageNum ? '#FFFFFF' : currentTheme.white,
+                                                border: pagination.current_page === pageNum ? 'none' : `1px solid ${currentTheme.border}`
+                                            }}
                                         >
                                             {pageNum}
                                         </button>
@@ -424,7 +492,12 @@ export default function Shop({
                                 <button
                                     onClick={() => handlePageChange(pagination.current_page + 1)}
                                     disabled={pagination.current_page >= pagination.last_page}
-                                    className="w-10 h-10 rounded-full border border-gray-200 text-sm font-medium disabled:opacity-40 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                                    className="w-10 h-10 rounded-full text-sm font-medium disabled:opacity-40 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                                    style={{ 
+                                        border: `1px solid ${currentTheme.border}`,
+                                        backgroundColor: currentTheme.card,
+                                        color: currentTheme.white
+                                    }}
                                 >
                                     →
                                 </button>
@@ -438,10 +511,13 @@ export default function Shop({
             {sidebarOpen && (
                 <div className="fixed inset-0 z-50 lg:hidden">
                     <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-                    <div className="absolute right-0 top-0 h-full w-[300px] bg-white overflow-y-auto">
-                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                            <h3 className="font-bold text-gray-900">Filters</h3>
-                            <button onClick={() => setSidebarOpen(false)} className="p-2">
+                    <div 
+                        className="absolute right-0 top-0 h-full w-[320px] overflow-y-auto transition-transform duration-300"
+                        style={{ backgroundColor: currentTheme.card }}
+                    >
+                        <div className={`p-4 flex items-center justify-between ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`} style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
+                            <h3 className="font-bold" style={{ color: currentTheme.white }}>Filters</h3>
+                            <button onClick={() => setSidebarOpen(false)} className="p-2" style={{ color: currentTheme.secondaryText }}>
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -461,6 +537,7 @@ export default function Shop({
                                 handleClearAll();
                                 setSidebarOpen(false);
                             }}
+                            theme={theme}
                         />
                     </div>
                 </div>

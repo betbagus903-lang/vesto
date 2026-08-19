@@ -26,6 +26,7 @@ import {
   FileText,
   X,
   Save,
+  Wand2,
 } from 'lucide-react';
 
 export default function ProductsIndex({ products, pagination, filters, categories, attributeFamilies, createdProduct: initialCreatedProduct }) {
@@ -68,8 +69,19 @@ export default function ProductsIndex({ products, pagination, filters, categorie
   };
 
   const getProductImage = (product) => {
-    if (product.image && product.image.length > 0) {
-      return `/storage/${product.image[0]}`;
+    // Try gallery images first
+    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+      const img = product.images[0];
+      if (!img) return null;
+      // Already absolute URL
+      if (img.startsWith('http') || img.startsWith('/storage')) return img;
+      return `/storage/${img}`;
+    }
+    // Fallback to single image field
+    if (product.image) {
+      const img = product.image;
+      if (img.startsWith('http') || img.startsWith('/storage')) return img;
+      return `/storage/${img}`;
     }
     return null;
   };
@@ -333,13 +345,25 @@ export default function ProductsIndex({ products, pagination, filters, categorie
                 : 'bg-white border border-gray-100'
             }`}>
               {/* Product Image */}
-              <div className="w-full h-48 overflow-hidden relative">
+              <div className="w-full h-48 overflow-hidden relative group">
                 {getProductImage(product) ? (
-                  <img
-                    src={getProductImage(product)}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    <img
+                      src={getProductImage(product)}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Design Button */}
+                    {product.image && product.image.length > 0 && (
+                      <button
+                        onClick={() => window.open(`/admin/products/design/${product.id}/image/0`, '_blank')}
+                        className="absolute top-3 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 shadow-lg"
+                      >
+                        <Wand2 size={12} />
+                        Design
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <div className={`w-full h-full flex items-center justify-center ${
                     theme === 'dark' ? 'bg-gradient-to-br from-blue-500/20 to-purple-500/20' : 'bg-gradient-to-br from-blue-100 to-purple-100'

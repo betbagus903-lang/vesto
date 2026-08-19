@@ -52,26 +52,6 @@ const menuItems = [
         route: '/admin/customers'
     },
     {
-        name: 'Suppliers',
-        icon: '🏭',
-        route: '/admin/suppliers'
-    },
-    {
-        name: 'Employees',
-        icon: '👔',
-        route: '/admin/employees'
-    },
-    {
-        name: 'Finance',
-        icon: '💰',
-        hasSubmenu: true,
-        submenu: [
-            { name: 'Transactions', route: '/admin/finance/transactions' },
-            { name: 'Invoices', route: '/admin/finance/invoices' },
-            { name: 'Expenses', route: '/admin/finance/expenses' }
-        ]
-    },
-    {
         name: 'Reports',
         icon: '📊',
         hasSubmenu: true,
@@ -100,11 +80,6 @@ const menuItems = [
         name: 'Messages',
         icon: '💬',
         route: '/admin/messages'
-    },
-    {
-        name: 'Calendar',
-        icon: '📅',
-        route: '/admin/calendar'
     },
     {
         name: 'CMS',

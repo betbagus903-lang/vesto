@@ -1,11 +1,15 @@
 import { Link } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
+import AccountSidebar from '../../Components/Buyer/AccountSidebar';
 
 export default function MyReviews({ reviews }) {
+    const { auth } = usePage().props;
+    const user = auth?.user;
     const renderStars = (rating) => {
         return Array(5).fill(0).map((_, i) => (
             <svg
                 key={i}
-                className={`w-4 h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                className={`w-4 h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-600'}`}
                 fill="currentColor"
                 viewBox="0 0 20 20"
             >
@@ -17,168 +21,75 @@ export default function MyReviews({ reviews }) {
     const getStatusBadge = (status) => {
         switch(status) {
             case 'approved':
-                return <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Approved</span>;
+                return <span className="text-green-400 text-xs">Approved</span>;
             case 'pending':
-                return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">Pending</span>;
+                return <span className="text-yellow-400 text-xs">Pending</span>;
             case 'hidden':
-                return <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">Hidden</span>;
+                return <span className="text-gray-400 text-xs">Hidden</span>;
             default:
-                return <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">{status}</span>;
+                return <span className="text-gray-400 text-xs">{status}</span>;
         }
     };
 
     return (
-        <div className="min-h-screen flex" style={{fontFamily: "'Inter', sans-serif"}}>
-            {/* Sidebar */}
-            <aside className="w-56 min-h-screen bg-white border-r border-gray-100 flex flex-col fixed top-0 left-0">
-                <div className="px-5 py-5 border-b border-gray-100">
-                    <Link href={route('home')} className="text-xl font-black tracking-widest text-gray-900">VESTO</Link>
-                </div>
-
-                <div className="flex-1 px-3 py-4">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-3">Account</p>
-                    <nav className="flex flex-col gap-1">
-                        <Link href={route('buyer.dashboard')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                            Dashboard
-                        </Link>
-                        <Link href={route('buyer.orders')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 11H4L5 9z"/></svg>
-                            My Orders
-                        </Link>
-                        <Link href={route('buyer.wishlist')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                            Wishlist
-                        </Link>
-                        <Link href={route('buyer.addresses')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            Addresses
-                        </Link>
-                        <Link href={route('buyer.reviews')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-100 text-gray-900 text-sm font-bold">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
-                            Reviews
-                        </Link>
-                        <Link href={route('buyer.profile')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            Profile
-                        </Link>
-                    </nav>
-
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-3 mt-6">Shop</p>
-                    <nav className="flex flex-col gap-1">
-                        <Link href={route('home')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            Shop Now
-                        </Link>
-                    </nav>
-                </div>
-
-                <div className="border-t border-gray-100 p-3">
-                    <div className="flex items-center gap-3 px-3 py-2 mb-1">
-                        <div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">
-                            {reviews.length > 0 ? reviews[0].user.name.charAt(0).toUpperCase() : 'U'}
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate">{reviews.length > 0 ? reviews[0].user.name : 'User'}</p>
-                            <p className="text-xs text-gray-400 truncate">{reviews.length > 0 ? reviews[0].user.email : 'user@example.com'}</p>
-                        </div>
-                    </div>
-                    <Link href={route('logout')} method="post" as="button"
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 text-sm font-semibold transition-colors">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                        Logout
-                    </Link>
-                </div>
-            </aside>
+        <div className="min-h-screen flex bg-[#0f172a]" style={{fontFamily: "'Inter', sans-serif"}}>
+            <AccountSidebar activeMenu="reviews" />
 
             {/* Main content */}
-            <div className="ml-56 flex-1 min-h-screen bg-gray-50">
-                <div className="px-10 py-10">
-
+            <div className="ml-72 flex-1 min-h-screen">
+                <div className="px-6 py-6">
                     {/* Header */}
-                    <div className="mb-8">
-                        <span className="text-xs font-semibold tracking-widest text-gray-400 uppercase">My Reviews</span>
-                        <h1 className="text-4xl font-black text-gray-900 mt-1" style={{letterSpacing: '-0.02em'}}>
+                    <div className="mb-6">
+                        <h1 className="text-xl font-semibold text-white">
                             Your Reviews
                         </h1>
-                        <p className="text-gray-500 text-sm mt-2">Manage and view all your product reviews.</p>
                     </div>
 
                     {/* Reviews List */}
                     {reviews.length === 0 ? (
-                        <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                                </svg>
-                            </div>
-                            <p className="font-bold text-gray-900 mb-1">No reviews yet</p>
-                            <p className="text-sm text-gray-400 mb-6">You haven't reviewed any products yet.</p>
-                            <Link href={route('home')} className="inline-block bg-gray-900 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors">
+                        <div className="bg-[#1e293b] rounded-lg p-8 text-center">
+                            <p className="text-white mb-2">No reviews yet</p>
+                            <p className="text-sm text-gray-400 mb-4">You haven't reviewed any products yet.</p>
+                            <Link href="/shop" className="text-sm text-gray-400 hover:text-white transition-colors">
                                 Start Shopping →
                             </Link>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {reviews.map(review => (
-                                <div key={review.id} className="bg-white border border-gray-100 rounded-2xl p-6">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-1">
+                                <div key={review.id} className="bg-[#1e293b] rounded-lg p-4">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-0.5">
                                                 {renderStars(review.rating)}
                                             </div>
                                             {getStatusBadge(review.status)}
                                         </div>
                                         <span className="text-xs text-gray-400">
-                                            {new Date(review.created_at).toLocaleDateString('en-US', { 
-                                                year: 'numeric', 
-                                                month: 'long', 
-                                                day: 'numeric' 
-                                            })}
+                                            {new Date(review.created_at).toLocaleDateString()}
                                         </span>
                                     </div>
 
-                                    <div className="mb-3">
-                                        <Link href={`/products/${review.product.slug}`} className="font-bold text-gray-900 hover:text-blue-600 transition-colors">
+                                    <div className="mb-2">
+                                        <Link href={`/products/${review.product.slug}`} className="text-sm text-white hover:text-gray-300 transition-colors">
                                             {review.product.name}
                                         </Link>
                                         {review.title && (
-                                            <h3 className="text-sm font-semibold text-gray-700 mt-1">{review.title}</h3>
+                                            <h3 className="text-xs text-gray-400 mt-0.5">{review.title}</h3>
                                         )}
                                     </div>
 
-                                    <p className="text-sm text-gray-600 mb-4">{review.comment}</p>
+                                    <p className="text-xs text-gray-400 mb-3">{review.comment}</p>
 
-                                    {review.images && review.images.length > 0 && (
-                                        <div className="flex gap-2 mb-4">
-                                            {review.images.map((image, index) => (
-                                                <img
-                                                    key={index}
-                                                    src={`/storage/${image}`}
-                                                    alt={`Review image ${index + 1}`}
-                                                    className="w-20 h-20 object-cover rounded-lg"
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <div className="pt-4 border-t border-gray-100">
-                                        <p className="text-xs text-gray-400">
-                                            Order: <span className="font-semibold text-gray-600">{review.order.order_number}</span>
+                                    <div className="pt-3 border-t border-gray-700">
+                                        <p className="text-xs text-gray-500">
+                                            Order: <span className="text-gray-400">{review.order.order_number}</span>
                                         </p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-
                 </div>
             </div>
         </div>

@@ -14,6 +14,9 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                display: ['"Bodoni Moda"', 'serif'],
+                body: ['Inter', 'sans-serif'],
+                mono: ['"JetBrains Mono"', 'monospace'],
             },
         },
     },

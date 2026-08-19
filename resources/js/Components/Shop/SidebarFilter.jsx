@@ -41,8 +41,23 @@ export default function SidebarFilter({
     color_filters = [],
     activeColors = [],
     onFilterChange,
-    onClearAll 
+    onClearAll,
+    theme = 'light'
 }) {
+    const currentTheme = theme === 'dark' ? {
+        background: '#111827',
+        border: 'rgba(255,255,255,0.08)',
+        white: '#FFFFFF',
+        secondaryText: '#A8B3CF',
+        muted: '#667085',
+    } : {
+        background: '#FFFFFF',
+        border: 'rgba(0,0,0,0.1)',
+        white: '#1A1A1A',
+        secondaryText: '#495057',
+        muted: '#6C757D',
+    };
+
     const [expandedSections, setExpandedSections] = useState({
         price: true,
         category: true,
@@ -132,12 +147,13 @@ export default function SidebarFilter({
         : sizeAttribute?.options?.slice(0, 5);
 
     return (
-        <div className="w-full bg-white border-r border-gray-200 sticky top-24 self-start">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="font-bold text-gray-900 text-lg">Filters</h3>
+        <div className="w-full sticky top-24 self-start" style={{ backgroundColor: currentTheme.background, borderRight: `1px solid ${currentTheme.border}` }}>
+            <div className="p-6 flex items-center justify-between" style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
+                <h3 className="font-bold text-lg" style={{ color: currentTheme.white }}>Filters</h3>
                 <button 
                     onClick={handleClearAll}
-                    className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                    className="text-sm flex items-center gap-1 hover:opacity-80"
+                    style={{ color: currentTheme.secondaryText }}
                 >
                     <X className="w-4 h-4" />
                     Clear All
@@ -146,10 +162,11 @@ export default function SidebarFilter({
 
             <div className="p-6 space-y-6">
                 {/* Price Filter */}
-                <div className="border-b border-gray-100 pb-6">
+                <div className="pb-6" style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
                     <button 
                         onClick={() => toggleSection('price')}
-                        className="w-full flex items-center justify-between font-semibold text-gray-900 mb-4 text-base"
+                        className="w-full flex items-center justify-between font-semibold mb-4 text-base"
+                        style={{ color: currentTheme.white }}
                     >
                         <span>Price</span>
                         {expandedSections.price ? (
@@ -170,12 +187,13 @@ export default function SidebarFilter({
                 </div>
 
                 {/* Category Filter */}
-                <div className="border-b border-gray-100 pb-6">
+                <div className="pb-6" style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
                     <button 
                         onClick={() => toggleSection('category')}
-                        className="w-full flex items-center justify-between font-semibold text-gray-900 mb-4 text-base"
+                        className="w-full flex items-center justify-between font-semibold mb-4 text-base"
+                        style={{ color: currentTheme.white }}
                     >
-                        <span>Category {activeCategory && <span className="text-xs font-normal text-gray-500">(1)</span>}</span>
+                        <span>Category {activeCategory && <span className="text-xs font-normal" style={{ color: currentTheme.muted }}>(1)</span>}</span>
                         {expandedSections.category ? (
                             <ChevronUp className="w-5 h-5" />
                         ) : (
@@ -190,9 +208,10 @@ export default function SidebarFilter({
                                         type="checkbox"
                                         checked={activeCategory === category.slug}
                                         onChange={() => handleCategoryToggle(category.slug)}
-                                        className="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                                        className="w-4 h-4 rounded"
+                                        style={{ borderColor: currentTheme.border }}
                                     />
-                                    <span className="text-sm text-gray-700">{category.name}</span>
+                                    <span className="text-sm" style={{ color: currentTheme.secondaryText }}>{category.name}</span>
                                 </label>
                             ))}
                         </div>
@@ -201,12 +220,13 @@ export default function SidebarFilter({
 
                 {/* Color Filter */}
                 {color_filters.length > 0 && (
-                    <div className="border-b border-gray-100 pb-6">
+                    <div className="pb-6" style={{ borderBottom: `1px solid ${currentTheme.border}` }}>
                         <button 
                             onClick={() => toggleSection('color')}
-                            className="w-full flex items-center justify-between font-semibold text-gray-900 mb-4 text-base"
+                            className="w-full flex items-center justify-between font-semibold mb-4 text-base"
+                            style={{ color: currentTheme.white }}
                         >
-                        <span>Color {selectedColors.length > 0 && <span className="text-xs font-normal text-gray-500">({selectedColors.length})</span>}</span>
+                        <span>Color {selectedColors.length > 0 && <span className="text-xs font-normal" style={{ color: currentTheme.muted }}>({selectedColors.length})</span>}</span>
                             {expandedSections.color ? (
                                 <ChevronUp className="w-5 h-5" />
                             ) : (

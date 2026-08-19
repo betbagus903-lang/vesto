@@ -41,6 +41,22 @@ export default function ConfigurableAttributesModal({ product, attributeFamily, 
         });
     };
 
+    const selectAllOptions = (attrId) => {
+        const attr = availableAttributes.find(a => a.id === attrId);
+        if (!attr) return;
+        setSelectedOptions(prev => ({
+            ...prev,
+            [attrId]: (attr.options || []).map(o => o.id),
+        }));
+    };
+
+    const deselectAllOptions = (attrId) => {
+        setSelectedOptions(prev => ({
+            ...prev,
+            [attrId]: [],
+        }));
+    };
+
     // Total variants = product of selected counts (only attrs with ≥1 selection)
     const totalVariants = (() => {
         const counts = Object.values(selectedOptions).filter(arr => arr.length > 0).map(arr => arr.length);
@@ -57,13 +73,19 @@ export default function ConfigurableAttributesModal({ product, attributeFamily, 
         }, {
             onFinish: () => setLoading(false),
             onSuccess: (page) => {
-                if (page.props.redirect_url) {
-                    window.location.href = page.props.redirect_url;
+                // Check for redirect in response or props
+                const redirectUrl = page.props.redirect_url || (page.props.flash?.redirect_url);
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
                 } else {
-                    onSuccess && onSuccess();
+                    // Fallback to configurable edit page (note: configurableedit without hyphen)
+                    window.location.href = `/admin/products/${product.id}/configurableedit`;
                 }
             },
-            onError: () => setLoading(false),
+            onError: (errors) => {
+                console.error('Error generating variants:', errors);
+                setLoading(false);
+            },
         });
     };
 
@@ -155,6 +177,39 @@ export default function ConfigurableAttributesModal({ product, attributeFamily, 
                                             </span>
                                         )}
                                         <div style={{ flex: 1, height: 1, backgroundColor: '#1E293B' }} />
+                                        {/* Select All / Deselect All buttons */}
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => selectAllOptions(attr.id)}
+                                                style={{
+                                                    padding: '4px 10px',
+                                                    fontSize: 11,
+                                                    border: '1px solid #3B82F6',
+                                                    borderRadius: 6,
+                                                    backgroundColor: '#1D4ED820',
+                                                    color: '#3B82F6',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                Select All
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => deselectAllOptions(attr.id)}
+                                                style={{
+                                                    padding: '4px 10px',
+                                                    fontSize: 11,
+                                                    border: '1px solid #EF4444',
+                                                    borderRadius: 6,
+                                                    backgroundColor: '#7F1D1D20',
+                                                    color: '#EF4444',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                Deselect All
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Chips */}

@@ -1,115 +1,365 @@
 import { Link } from '@inertiajs/react';
+import { useState } from 'react';
+import AccountSidebar from '../../Components/Buyer/AccountSidebar';
+import { useBuyerTheme } from '../../Context/BuyerThemeContext';
+import ShippingProgressTracker from '../../Components/Buyer/ShippingProgressTracker';
+import StatusHistoryTimeline from '../../Components/Buyer/StatusHistoryTimeline';
+import OrderDetailCard from '../../Components/Buyer/OrderDetailCard';
+import { Package, ChevronRight, Clock, Truck, CheckCircle, XCircle, AlertCircle, ExternalLink, Moon, Sun, Menu, X, Search, Heart, Bell } from 'lucide-react';
 
-export default function Orders({ user }) {
+export default function Orders({ orders }) {
+    const [selectedOrder, setSelectedOrder] = useState(orders.length > 0 ? orders[0] : null);
+    const { theme, toggleTheme } = useBuyerTheme();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    const themeStyles = {
+        dark: {
+            bg: 'bg-[#0a0f1a]',
+            headerBg: 'bg-[#0a1628]',
+            border: 'border-white/10',
+            text: 'text-white',
+            textMuted: 'text-white/50',
+            textMutedLight: 'text-white/40',
+            cardBg: 'bg-white/5',
+            cardBgLight: 'bg-white/10',
+            hoverBg: 'hover:bg-white/10',
+            inputBg: 'bg-[#1e3a5f]',
+        },
+        light: {
+            bg: 'bg-gray-50',
+            headerBg: 'bg-white',
+            border: 'border-gray-200',
+            text: 'text-gray-900',
+            textMuted: 'text-gray-600',
+            textMutedLight: 'text-gray-400',
+            cardBg: 'bg-white',
+            cardBgLight: 'bg-gray-100',
+            hoverBg: 'hover:bg-gray-100',
+            inputBg: 'bg-gray-100',
+        },
+    };
+
+    const styles = themeStyles[theme];
+
+    const getStatusColor = (status) => {
+        switch(status) {
+            case 'Menunggu Pembayaran':
+                return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+            case 'Dikemas':
+                return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+            case 'Dikirim':
+                return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+            case 'Selesai':
+                return 'bg-green-500/20 text-green-400 border-green-500/30';
+            case 'Dibatalkan':
+                return 'bg-red-500/20 text-red-400 border-red-500/30';
+            default:
+                return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+        }
+    };
+
+    const getStatusIcon = (status) => {
+        switch(status) {
+            case 'Menunggu Pembayaran':
+                return <Clock className="w-4 h-4" />;
+            case 'Dikemas':
+                return <AlertCircle className="w-4 h-4" />;
+            case 'Dikirim':
+                return <Truck className="w-4 h-4" />;
+            case 'Selesai':
+                return <CheckCircle className="w-4 h-4" />;
+            case 'Dibatalkan':
+                return <XCircle className="w-4 h-4" />;
+            default:
+                return <Package className="w-4 h-4" />;
+        }
+    };
+
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+        }).format(price);
+    };
+
+    const getShippingStage = (status) => {
+        switch(status) {
+            case 'pending':
+                return 'dikemas';
+            case 'processing':
+                return 'dikemas';
+            case 'shipped':
+                return 'dikirim';
+            case 'delivered':
+                return 'diterima';
+            case 'completed':
+                return 'diterima';
+            case 'cancelled':
+                return 'dikemas';
+            default:
+                return 'dikemas';
+        }
+    };
+
+    const getStatusHistory = (order) => {
+        // Use real status history from backend if available
+        if (order.status_history && order.status_history.length > 0) {
+            return order.status_history;
+        }
+
+        // Fallback to mock data with realistic timestamps if no history exists
+        const history = [];
+        const status = order.status_raw || 'pending';
+
+        // Base date from order
+        const baseDate = new Date(order.date);
+
+        history.push({
+            id: 1,
+            status: 'dikemas',
+            label: 'Dikemas',
+            date: formatDateTime(baseDate, 0, 9, 15), // 09:15
+            description: 'Pesanan selesai dikemas'
+        });
+
+        if (status === 'shipped' || status === 'delivered' || status === 'completed') {
+            history.push({
+                id: 2,
+                status: 'dikirim',
+                label: 'Dikirim',
+                date: formatDateTime(baseDate, 0, 13, 20), // 13:20 same day
+                description: 'Pesanan telah diambil oleh kurir'
+            });
+        }
+
+        if (status === 'delivered' || status === 'completed') {
+            history.push({
+                id: 3,
+                status: 'dalam_perjalanan',
+                label: 'Dalam Perjalanan',
+                date: formatDateTime(baseDate, 0, 18, 40), // 18:40 same day
+                description: 'Pesanan sedang dalam perjalanan'
+            });
+            history.push({
+                id: 4,
+                status: 'diterima',
+                label: 'Diterima',
+                date: formatDateTime(baseDate, 1, 14, 25), // 14:25 next day
+                description: 'Pesanan telah diterima oleh pembeli'
+            });
+        }
+
+        return history;
+    };
+
+    const formatDateTime = (baseDate, dayOffset, hours, minutes) => {
+        const date = new Date(baseDate);
+        date.setDate(date.getDate() + dayOffset);
+        date.setHours(hours, minutes, 0, 0);
+        return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + 
+               date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+    };
+
     return (
-        <div className="min-h-screen flex" style={{fontFamily: "'Inter', sans-serif"}}>
+        <div className={`min-h-screen flex ${styles.bg}`} style={{ fontFamily: "'Inter', sans-serif" }}>
+            {/* Mobile Sidebar Overlay */}
+            {sidebarOpen && (
+                <div
+                    className={`fixed inset-0 z-50 lg:hidden ${theme === 'dark' ? 'bg-black/50' : 'bg-black/30'}`}
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
 
-            {/* Sidebar */}
-            <aside className="w-56 min-h-screen bg-white border-r border-gray-100 flex flex-col fixed top-0 left-0">
-                <div className="px-5 py-5 border-b border-gray-100">
-                    <Link href={route('home')} className="text-xl font-black tracking-widest text-gray-900">VESTO</Link>
-                </div>
+            {/* Mobile Sidebar */}
+            <div className={`fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 lg:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <AccountSidebar activeMenu="orders" />
+            </div>
 
-                <div className="flex-1 px-3 py-4">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-3">Account</p>
-                    <nav className="flex flex-col gap-1">
-                        <Link href={route('buyer.dashboard')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                            Dashboard
-                        </Link>
-                        <Link href={route('buyer.orders')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-100 text-gray-900 text-sm font-bold">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 11H4L5 9z"/></svg>
-                            My Orders
-                        </Link>
-                        <Link href={route('buyer.wishlist')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                            Wishlist
-                        </Link>
-                        <Link href={route('buyer.addresses')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            Addresses
-                        </Link>
-                        <Link href={route('buyer.reviews')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
-                            Reviews
-                        </Link>
-                        <Link href={route('buyer.profile')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            Profile
-                        </Link>
-                    </nav>
+            {/* Desktop Sidebar */}
+            <div className="hidden lg:block">
+                <AccountSidebar activeMenu="orders" />
+            </div>
 
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 px-3 mt-6">Shop</p>
-                    <nav className="flex flex-col gap-1">
-                        <Link href={route('home')}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 text-sm font-semibold transition-colors">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            Shop Now
-                        </Link>
-                    </nav>
-                </div>
-
-                <div className="border-t border-gray-100 p-3">
-                    <div className="flex items-center gap-3 px-3 py-2 mb-1">
-                        <div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">
-                            {user.name.charAt(0).toUpperCase()}
+            <div className="flex-1 min-h-screen transition-all duration-300 lg:ml-72 ml-0">
+                {/* Top Header */}
+                <div className={`${styles.headerBg} border-b ${styles.border} px-4 md:px-6 py-4 sticky top-0 z-40`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => setSidebarOpen(!sidebarOpen)}
+                                className={`lg:hidden p-2 ${styles.hoverBg} rounded-lg transition-colors`}
+                            >
+                                {sidebarOpen ? <X className={`w-5 h-5 ${styles.text}`} /> : <Menu className={`w-5 h-5 ${styles.text}`} />}
+                            </button>
+                            <div>
+                                <h1 className={`text-lg md:text-xl font-bold ${styles.text}`}>
+                                    My Orders
+                                </h1>
+                                <p className={`text-xs md:text-sm ${styles.textMuted} mt-0.5 hidden sm:block`}>
+                                    Track and manage your orders
+                                </p>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
-                            <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                        <div className="flex items-center gap-2 md:gap-4">
+                            <button
+                                onClick={toggleTheme}
+                                className={`p-2 ${styles.hoverBg} rounded-lg transition-colors`}
+                                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                            >
+                                {theme === 'dark' ? <Sun className={`w-5 h-5 ${styles.textMuted}`} /> : <Moon className={`w-5 h-5 ${styles.textMuted}`} />}
+                            </button>
                         </div>
                     </div>
-                    <Link href={route('logout')} method="post" as="button"
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 text-sm font-semibold transition-colors">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                        Logout
-                    </Link>
                 </div>
-            </aside>
 
-            {/* Main content */}
-            <div className="ml-56 flex-1 min-h-screen bg-gray-50">
-                <div className="px-10 py-10">
+                <div className="p-6 md:p-8">
 
                     <div className="mb-8">
-                        <span className="text-xs font-semibold tracking-widest text-gray-400 uppercase">My Account</span>
-                        <h1 className="text-4xl font-black text-gray-900 mt-1" style={{letterSpacing: '-0.02em'}}>My Orders</h1>
-                        <p className="text-gray-500 text-sm mt-2">Track and manage all your orders.</p>
+                        <h1 className={`text-2xl font-medium ${styles.text} tracking-wide`}>My Orders</h1>
+                        <p className={`text-sm ${styles.textMutedLight} mt-1`}>Lihat dan lacak semua pesanan yang telah kamu buat.</p>
                     </div>
 
-                    {/* Filter Tabs */}
-                    <div className="flex gap-2 mb-6 flex-wrap">
-                        {['All', 'Processing', 'On the Way', 'Delivered', 'Cancelled'].map((tab, i) => (
-                            <button key={tab}
-                                className={`text-xs font-semibold px-4 py-2 rounded-full border transition-colors ${
-                                    i === 0
-                                        ? 'bg-gray-900 text-white border-gray-900'
-                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-                                }`}>
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Empty State */}
-                    <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 11H4L5 9z"/>
-                            </svg>
+                    {/* Orders List */}
+                    {orders.length === 0 ? (
+                        <div className={`${styles.cardBg} ${styles.border} rounded-2xl p-16 text-center`}>
+                            <div className={`w-16 h-16 ${styles.cardBgLight} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                                <Package className={`w-8 h-8 ${styles.textMutedLight}`} />
+                            </div>
+                            <p className={`font-medium ${styles.text} mb-1`}>Belum ada pesanan</p>
+                            <p className={`text-sm ${styles.textMutedLight} mb-6`}>Mulai belanja untuk melihat pesanan Anda di sini.</p>
+                            <Link href="/shop" className={`inline-block ${styles.cardBgLight} ${styles.text} text-sm font-medium px-6 py-3 rounded-xl ${styles.hoverBg} transition-colors`}>
+                                Mulai Belanja →
+                            </Link>
                         </div>
-                        <p className="font-black text-gray-900 mb-1">No orders yet</p>
-                        <p className="text-sm text-gray-400 mb-6">Start shopping to see your orders here.</p>
-                        <Link href={route('home')} className="inline-block bg-gray-900 text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-gray-700 transition-colors">
-                            Shop Now →
-                        </Link>
-                    </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Selected Order Header */}
+                            {selectedOrder && (
+                                <div className={`${styles.cardBg} ${styles.border} rounded-2xl p-5`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-16 h-16 ${styles.cardBgLight} rounded-xl overflow-hidden flex-shrink-0`}>
+                                            <img
+                                                src={selectedOrder.image || 'https://via.placeholder.com/64'}
+                                                alt={selectedOrder.product}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`${styles.textMuted} text-xs mb-1`}>#{selectedOrder.order_number}</p>
+                                            <p className={`${styles.text} font-medium mb-1`}>{selectedOrder.product}</p>
+                                            <p className={`${styles.textMuted} text-sm`}>{selectedOrder.date}</p>
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                            <p className={`${styles.textMutedLight} text-xs mb-1`}>{selectedOrder.items_count} Item · {formatPrice(selectedOrder.total)}</p>
+                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1.5 ${getStatusColor(selectedOrder.status)}`}>
+                                                {getStatusIcon(selectedOrder.status)}
+                                                {selectedOrder.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Shipping Progress Tracker */}
+                            {selectedOrder && (
+                                <ShippingProgressTracker currentStage={getShippingStage(selectedOrder.status_raw)} />
+                            )}
+
+                            {/* Delivery Summary */}
+                            {selectedOrder && selectedOrder.shipment && (
+                                <div className={`${styles.cardBg} ${styles.border} rounded-2xl p-5`}>
+                                    <div className="flex items-center justify-between flex-wrap gap-4">
+                                        <div className="flex items-center gap-6">
+                                            <div>
+                                                <p className={`${styles.textMuted} text-xs mb-1`}>Kurir</p>
+                                                <p className={`${styles.text} text-sm`}>{selectedOrder.shipment.carrier || '-'}</p>
+                                            </div>
+                                            <div>
+                                                <p className={`${styles.textMuted} text-xs mb-1`}>No. Resi</p>
+                                                <p className={`${styles.text} text-sm font-mono`}>{selectedOrder.shipment.tracking_number || '-'}</p>
+                                            </div>
+                                            {selectedOrder.shipment.estimated_delivery && (
+                                                <div>
+                                                    <p className={`${styles.textMuted} text-xs mb-1`}>Estimasi Tiba</p>
+                                                    <p className={`${styles.text} text-sm`}>{selectedOrder.shipment.estimated_delivery}</p>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className={`${styles.textMuted} text-xs mb-1`}>Status</p>
+                                                <p className={`${styles.text} text-sm`}>{selectedOrder.status}</p>
+                                            </div>
+                                        </div>
+                                        {selectedOrder.shipment.tracking_number && (
+                                            <button className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white text-sm font-medium px-4 py-2 rounded-xl transition-all duration-300">
+                                                Lacak Pesanan <ExternalLink size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Two Column: Status History + Order Detail */}
+                            {selectedOrder && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <StatusHistoryTimeline
+                                        history={getStatusHistory(selectedOrder)}
+                                        currentStatus={getShippingStage(selectedOrder.status_raw)}
+                                    />
+                                    <OrderDetailCard order={selectedOrder} />
+                                </div>
+                            )}
+
+                            {/* Orders List */}
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className={`text-lg font-medium ${styles.text}`}>Semua Pesanan</h3>
+                                    <p className={`text-xs ${styles.textMuted}`}>Riwayat seluruh pesananmu</p>
+                                </div>
+                                <div className="space-y-3">
+                                    {orders.map((order) => (
+                                        <div
+                                            key={order.id}
+                                            className={`${styles.cardBg} ${styles.border} rounded-xl p-4 ${styles.hoverBg} transition-all duration-300 cursor-pointer ${
+                                                selectedOrder?.id === order.id ? 'border-violet-500/50 bg-violet-500/5' : ''
+                                            }`}
+                                            onClick={() => setSelectedOrder(order)}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-14 h-14 ${styles.cardBgLight} rounded-lg overflow-hidden flex-shrink-0`}>
+                                                    <img
+                                                        src={order.image || 'https://via.placeholder.com/56'}
+                                                        alt={order.product}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`${styles.textMuted} text-xs mb-1`}>{order.order_number}</p>
+                                                    <p className={`${styles.text} font-medium text-sm mb-1 truncate`}>{order.product}</p>
+                                                    <p className={`${styles.textMutedLight} text-xs`}>{order.date}</p>
+                                                </div>
+                                                <div className="text-right flex-shrink-0">
+                                                    <p className={`${styles.textMutedLight} text-xs mb-1`}>{order.items_count} Item</p>
+                                                    <p className={`${styles.text} font-medium text-sm`}>{formatPrice(order.total)}</p>
+                                                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium border flex items-center gap-1 ${getStatusColor(order.status)}`}>
+                                                        {getStatusIcon(order.status)}
+                                                        {order.status}
+                                                    </span>
+                                                </div>
+                                                <Link
+                                                    href={`/buyer/orders/${order.id}`}
+                                                    className={`text-sm ${styles.textMuted} hover:${styles.text} transition-colors flex items-center gap-1 flex-shrink-0`}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <ChevronRight size={16} />
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>

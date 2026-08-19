@@ -166,7 +166,7 @@ class ProductController extends Controller
             ], self::ADMIN_ROOT_VIEW)->with('success', 'Product berhasil dibuat.');
         } else {
             // For simple and other types, redirect directly to edit page
-            return redirect()->route('admin.products.edit', $product->id)->with('success', 'Product berhasil dibuat.');
+            return redirect()->route('admin.products.configurableedit', $product->id)->with('success', 'Product berhasil dibuat.');
         }
     }
 
@@ -1274,4 +1274,246 @@ class ProductController extends Controller
         ];
     }
 
+
+    public function designImage($id, $index)
+    {
+        $product = Product::findOrFail($id);
+
+        // Handle "new" index for creating new design
+        if ($index === 'new') {
+            return Inertia::render('Admin/CMS/Banners/Designer', [
+                'returnUrl'    => route('admin.products.edit', $product->id),
+                'initialImage' => null, // Canvas kosong
+                'canvasWidth'  => 800,
+                'canvasHeight' => 800,
+                'bannerType'   => 'product_image',
+                'context'      => [
+                    'type'        => 'product_image',
+                    'productId'   => $product->id,
+                    'imageIndex'  => 'new', // Flag untuk append, bukan replace
+                    'productName' => $product->name,
+                ],
+            ]);
+        }
+
+        $images = is_array($product->images) ? $product->images : (json_decode($product->images, true) ?? []);
+
+        $imageUrl = isset($images[$index])
+            ? (str_starts_with($images[$index], 'http') ? $images[$index] : Storage::url($images[$index]))
+            : null;
+
+        return Inertia::render('Admin/CMS/Banners/Designer', [
+            'returnUrl'    => route('admin.products.edit', $product->id),
+            'initialImage' => $imageUrl,
+            'canvasWidth'  => 800,
+            'canvasHeight' => 800,
+            'bannerType'   => 'product_image',
+            'context'      => [
+                'type'        => 'product_image',
+                'productId'   => $product->id,
+                'imageIndex'  => $index,
+                'productName' => $product->name,
+            ],
+        ]);
+    }
+
+    public function designVariantImage($id, $variantId, $index)
+    {
+        $product = Product::findOrFail($id);
+        $variant = $product->variants()->findOrFail($variantId);
+
+        // Handle "new" index for creating new design
+        if ($index === 'new') {
+            $copyFromId = request('copyFrom');
+            $layoutJson = null;
+            
+            // If copyFrom provided, get layout_json from that variant
+            if ($copyFromId) {
+                $sourceVariant = $product->variants()->find($copyFromId);
+                \Log::info('Copy Layout Debug', [
+                    'copyFromId' => $copyFromId,
+                    'sourceVariant' => $sourceVariant ? $sourceVariant->id : null,
+                    'has_design_layout' => $sourceVariant ? !is_null($sourceVariant->design_layout) : false,
+                    'design_layout_type' => $sourceVariant && $sourceVariant->design_layout ? gettype($sourceVariant->design_layout) : null,
+                ]);
+                
+                if ($sourceVariant && $sourceVariant->design_layout) {
+                    $layoutJson = $sourceVariant->design_layout;
+                }
+            }
+            
+            return Inertia::render('Admin/CMS/Banners/Designer', [
+                'returnUrl'    => route('admin.products.configurableedit', $product->id),
+                'initialImage' => null, // Canvas kosong
+                'canvasWidth'  => 800,
+                'canvasHeight' => 800,
+                'bannerType'   => 'product_variant',
+                'layoutJson'   => $layoutJson, // Copy layout dari variant lain
+                'context'      => [
+                    'type'        => 'variant_image',
+                    'productId'   => $product->id,
+                    'variantId'   => $variantId,
+                    'imageIndex'  => 'new', // Flag untuk append
+                    'productName' => $product->name,
+                    'copiedFrom'  => $copyFromId ?? null,
+                ],
+            ]);
+        }
+
+        $images = is_array($variant->images) ? $variant->images : (json_decode($variant->images, true) ?? []);
+
+        $imageUrl = isset($images[$index])
+            ? (str_starts_with($images[$index], 'http') ? $images[$index] : Storage::url($images[$index]))
+            : null;
+
+        // Load existing layout if available
+        $layoutJson = $variant->design_layout ?? null;
+
+        return Inertia::render('Admin/CMS/Banners/Designer', [
+            'returnUrl'    => route('admin.products.configurableedit', $product->id),
+            'initialImage' => $imageUrl,
+            'layoutJson'   => $layoutJson, // Load existing layout for editing
+            'canvasWidth'  => 800,
+            'canvasHeight' => 800,
+            'bannerType'   => 'product_variant',
+            'context'      => [
+                'type'        => 'variant_image',
+                'productId'   => $product->id,
+                'variantId'   => $variantId,
+                'imageIndex'  => $index,
+                'productName' => $product->name,
+            ],
+        ]);
+    }
+
+    public function saveProductDesign(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|string',
+            'layout_json' => 'required',
+            'product_id' => 'required|integer',
+            'type' => 'required|in:product_image,variant_image',
+            'image_index' => 'required', // bisa integer atau 'new'
+        ]);
+
+        $product = Product::findOrFail($request->product_id);
+        $imagePath = $this->saveDesignImage($request->image);
+
+        if ($request->type === 'product_image') {
+            // Product images
+            $images = is_array($product->images) ? $product->images : (json_decode($product->images, true) ?? []);
+            
+            if ($request->image_index === 'new') {
+                // Append new image
+                $images[] = $imagePath;
+            } else {
+                // Replace existing image at index
+                $images[(int)$request->image_index] = $imagePath;
+            }
+            
+            $product->images = $images;
+            $product->save();
+        } elseif ($request->type === 'variant_image') {
+            $variant = $product->variants()->findOrFail($request->variant_id);
+            $images = is_array($variant->images) ? $variant->images : (json_decode($variant->images, true) ?? []);
+            
+            if ($request->image_index === 'new') {
+                // Append new image
+                $images[] = $imagePath;
+            } else {
+                // Replace existing image at index - IMPORTANT: Always replace, never append
+                $imageIndex = (int)$request->image_index;
+                if (isset($images[$imageIndex])) {
+                    // Delete old image file
+                    $oldImage = $images[$imageIndex];
+                    if ($oldImage && !str_starts_with($oldImage, 'http')) {
+                        Storage::disk('public')->delete($oldImage);
+                    }
+                }
+                $images[$imageIndex] = $imagePath;
+            }
+            
+            $variant->images = array_values($images); // Re-index array
+            
+            // Save layout_json to variant for future copy
+            if ($request->has('layout_json')) {
+                $variant->design_layout = $request->layout_json;
+            }
+            
+            $variant->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'url' => Storage::url($imagePath),
+            'path' => $imagePath,
+            'message' => 'Design saved successfully',
+        ]);
+    }
+
+    private function saveDesignImage($base64Image)
+    {
+        $imageData = explode(',', $base64Image);
+        $image = base64_decode(end($imageData));
+        $fileName = 'product-design-' . time() . '.png';
+        $path = 'products/' . $fileName;
+        Storage::disk('public')->put($path, $image);
+        return $path;
+    }
+
+    public function getVariant($variantId)
+    {
+        $variant = \App\Models\ProductVariant::findOrFail($variantId);
+        
+        return response()->json([
+            'variant' => [
+                'id' => $variant->id,
+                'name' => $variant->name,
+                'sku' => $variant->sku,
+                'price' => $variant->price,
+                'stock' => $variant->stock,
+                'weight' => $variant->weight,
+                'is_active' => $variant->is_active,
+                'images' => $variant->images ?? [],
+            ]
+        ]);
+    }
+
+    public function copyVariantDesign(Request $request, $variantId)
+    {
+        $request->validate([
+            'target_variant_ids' => 'required|array',
+            'target_variant_ids.*' => 'integer|exists:product_variants,id',
+        ]);
+
+        $sourceVariant = \App\Models\ProductVariant::findOrFail($variantId);
+        
+        if (empty($sourceVariant->images)) {
+            return response()->json(['message' => 'Source variant has no images to copy'], 400);
+        }
+
+        $copiedCount = 0;
+        
+        foreach ($request->target_variant_ids as $targetId) {
+            $targetVariant = \App\Models\ProductVariant::find($targetId);
+            if ($targetVariant && $targetVariant->product_id === $sourceVariant->product_id) {
+                // Copy images
+                $targetVariant->images = $sourceVariant->images;
+                
+                // Copy design_layout if exists
+                if ($sourceVariant->design_layout) {
+                    $targetVariant->design_layout = $sourceVariant->design_layout;
+                }
+                
+                $targetVariant->save();
+                $copiedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'copied_count' => $copiedCount,
+            'message' => "Design copied to {$copiedCount} variant(s)",
+        ]);
+    }
 }
