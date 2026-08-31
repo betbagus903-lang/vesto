@@ -13,10 +13,9 @@ export default defineConfig({
     },
     plugins: [
         laravel({
-            input: ['resources/js/app.jsx', 'resources/js/app.js'],
+            input: ['resources/js/app.jsx'],
             refresh: true,
         }),
         react(),
-        vue(),
     ],
 });

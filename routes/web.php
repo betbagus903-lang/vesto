@@ -59,6 +59,9 @@ Route::middleware(['auth'])->group(function () {
     
     // Earth Well landing page
     Route::get('/earthwell', fn() => Inertia::render('EarthWell'))->name('earthwell');
+
+    // Space sandbox page (Earth + Moon physics prototype)
+    Route::get('/space', fn() => Inertia::render('Space'))->name('space');
     
     // Shop (dengan opsi category)
     Route::get('/shop/{category?}', [StorefrontController::class, 'shop'])->name('shop');
